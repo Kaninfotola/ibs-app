@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<title>IBS Tracker</title>
+</head>
+<body>
+
+<nav class="navbar">
+  
+  <button id="navHome" class="nav-btn active">Start</button>
+  <button id="navHistory" class="nav-btn">Verlauf</button>
+  <button id="navFood" class="nav-btn">Essen</button>
+</nav>
+<h1>IBS Tracker</h1>
+
+<div id="homeSection">
+  <section>
+  <h2>Bauchschmerzen & Blähungen</h2>
+  <label>Bauchschmerzen:</label>
+  <div class="scale-group" id="painScale"></div>
+  <input type="hidden" id="pain" value="1">
+  <label>Blähungen:</label>
+  <div class="scale-group" id="bloatingScale"></div>
+  <input type="hidden" id="bloating" value="1">
+  <label>Datum & Uhrzeit: <input type="datetime-local" id="painDate"></label>
+  <button onclick="savePainBloating()">Speichern</button>
+  </section>
+  <section>
+  <h2>Poopie</h2>
+  <label>Poopie Konsistenz (1-7):</label>
+  <div id="bristolScale" class="bristol-scale"></div>
+  <input type="hidden" id="bristol" value="0">
+  <label>Entleerung: 
+    <select id="evacuation">
+      <option value="partial">Teilweise</option>
+      <option value="full">Vollständig</option>
+    </select>
+  </label>
+  <label>Druck:</label>
+  <div class="scale-group" id="pressureScale"></div>
+  <input type="hidden" id="pressure" value="1">
+  <label>Nässe:</label>
+  <div class="scale-group" id="wetnessScale"></div>
+  <input type="hidden" id="wetness" value="1">
+  <label>Datum & Uhrzeit: <input type="datetime-local" id="bmDate"></label>
+  <button onclick="saveBM()">Speichern</button>
+  </section>
+  <section>
+  <h2>Essen</h2>
+  <label>Geschwindigkeit:</label>
+  <div class="scale-group" id="speedScale"></div>
+  <input type="hidden" id="speed" value="0">
+  <label>Größe:</label>
+  <div class="scale-group" id="sizeScale"></div>
+  <input type="hidden" id="size" value="0">
+  <label>Risiko:</label>
+  <div class="scale-group" id="riskScale"></div>
+  <input type="hidden" id="risk" value="0">
+  <label>Essensname:
+    <input type="text" id="foodText" autocomplete="off" oninput="showFoodSuggestions()" onfocus="showFoodSuggestions()">
+    <div id="foodSuggestions" class="suggestions-list" style="display:none;"></div>
+  </label>
+  <label>Tags (Komma getrennt): <input type="text" id="tags"></label>
+  <label>Datum & Uhrzeit: <input type="datetime-local" id="foodDate"></label>
+  <button onclick="saveFood()">Speichern</button>
+</section>
+<section>
+  <div class="section-header">
+    <h2>Log</h2>
+    <button class="secondary-button" onclick="openImportRecordsDialog()">JSON importieren</button>
+    <button class="secondary-button" onclick="exportRecordsAsJson()">Als JSON exportieren</button>
+  </div>
+  <ul id="log"></ul>
+</section>
+</div>
+
+<section id="historySection" style="display:none;">
+  <div class="section-header history-header">
+    <h2>Verlauf</h2>
+  </div>
+  <div class="history-actions">
+    <button id="historyCalendarToggle" class="secondary-button calendar-toggle-button" onclick="toggleHistoryCalendar()" title="Kalenderansicht" aria-label="Kalenderansicht">📅</button>
+    <button class="secondary-button" onclick="openImportRecordsDialog()">JSON importieren</button>
+    <button class="secondary-button" onclick="exportRecordsAsJson()">Als JSON exportieren</button>
+  </div>
+  <div id="historyCalendarContainer" class="calendar-panel" style="display:none;">
+    <div class="calendar-toolbar">
+      <button class="secondary-button calendar-nav-button" onclick="changeHistoryCalendarMonth(-1)" aria-label="Vorheriger Monat">◀</button>
+      <div id="historyCalendarMonthLabel" class="calendar-month-label"></div>
+      <button class="secondary-button calendar-nav-button" onclick="changeHistoryCalendarMonth(1)" aria-label="Nächster Monat">▶</button>
+    </div>
+    <div class="calendar-legend">
+      <span class="calendar-legend-item"><span class="calendar-legend-color neutral"></span>Neutral</span>
+      <span class="calendar-legend-item"><span class="calendar-legend-color mild"></span>Mild</span>
+      <span class="calendar-legend-item"><span class="calendar-legend-color medium"></span>Mittel</span>
+      <span class="calendar-legend-item"><span class="calendar-legend-color severe"></span>Stark</span>
+    </div>
+    <div id="historyCalendarGrid" class="calendar-grid"></div>
+  </div>
+  <div id="historyLog"></div>
+</section>
+
+<section id="FoodSection" style="display:none;">
+  <div class="section-header">
+    <h2>Gespeichertes Essen</h2>
+    <button class="secondary-button" onclick="addFoodFromList()">+ Hinzufügen</button>
+  </div>
+  <div id="savedFoodsList"></div>
+</section>
+  
+</section>
+
+
+
+
+
+<input type="file" id="importRecordsInput" accept="application/json,.json" style="display:none;">
+<script src="app.js"></script>
+</body>
+</html>

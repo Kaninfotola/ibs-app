@@ -1,0 +1,11 @@
+{
+  "name": "IBS Tracker",
+  "short_name": "IBS",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff9999",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
