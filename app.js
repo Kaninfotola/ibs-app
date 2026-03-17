@@ -247,8 +247,8 @@ function buildDaySeveritySummary(dayInfo) {
   const details = [];
   if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh ≥3`);
   if (dayInfo.painMediumCount > 0) details.push(`${dayInfo.painMediumCount}× Bauchweh 2`);
-  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie >6`);
-  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 6`);
+  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1/7`);
+  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5/6`);
   if (details.length === 0) details.push("Unauffällig");
   return details.join(" | ");
 }
@@ -258,7 +258,7 @@ function classifyDaySeverity(dayInfo) {
     return "neutral";
   }
 
-  if (dayInfo.painHighCount >= 2 || dayInfo.bristolHighCount >= 1 || dayInfo.score >= 4) {
+  if (dayInfo.painHighCount >= 2 || dayInfo.bristolHighCount >= 1 || dayInfo.score >= 4 || dayInfo.bristolMediumCount >= 3) {
     return "severe";
   }
 
@@ -315,13 +315,15 @@ function buildHistoryDayMap(records) {
 
     if (record.type === "bm") {
       const bristol = parseNumberValue(record.bristolScale, 0);
-      if (bristol > 6) {
+      if(bristol === 1 || bristol ===7){
         dayInfo.bristolHighCount += 1;
         dayInfo.score += 3;
-      } else if (bristol === 6) {
-        dayInfo.bristolMediumCount += 1;
-        dayInfo.score += 2;
       }
+      else if (bristol > 4||bristol < 3)  {
+       dayInfo.bristolMediumCount += 1;
+        dayInfo.score += 2;
+      } 
+      
     }
   });
 
@@ -452,6 +454,8 @@ function setActiveView(viewName) {
   if (activeConfig && typeof activeConfig.onShow === "function") {
     activeConfig.onShow();
   }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function initNavigation() {
@@ -537,7 +541,7 @@ function createFoodCard(food) {
   detailsDiv.className = "labels";
   const details = [];
   if (Array.isArray(food.tags) && food.tags.length > 0) {
-    details.push(`Tags: ${food.tags.filter(Boolean).join(", ")}`);
+    details.push(`Zutaten: ${food.tags.filter(Boolean).join(", ")}`);
   }
   detailsDiv.textContent = details.join(" | ");
   card.appendChild(detailsDiv);
@@ -599,7 +603,7 @@ function editFoodItem(foodId, event) {
   const tagsInput = document.createElement("input");
   tagsInput.type = "text";
   tagsInput.value = Array.isArray(food.tags) ? food.tags.join(", ") : "";
-  appendField(card, "Tags", tagsInput);
+  appendField(card, "Zutaten", tagsInput);
 
   card.appendChild(createButton("Speichern", () => {
     const updatedName = nameInput.value.trim();
@@ -700,6 +704,37 @@ function parseNumberValue(value, fallback = 0) {
   return Number.isNaN(parsedValue) ? fallback : parsedValue;
 }
 
+function clampNumberValue(value, min, max, fallback = min) {
+  const parsedValue = parseNumberValue(value, fallback);
+  return Math.min(max, Math.max(min, parsedValue));
+}
+
+function normalizeTextValue(value, maxLength = 120) {
+  if (value === undefined || value === null) return "";
+  return String(value).trim().slice(0, maxLength);
+}
+
+function normalizeTagListValue(value, options = {}) {
+  const maxTags = options.maxTags || 20;
+  const maxTagLength = options.maxTagLength || 30;
+  if (!Array.isArray(value)) return [];
+
+  const uniqueTags = [];
+  value.forEach(tag => {
+    const normalizedTag = normalizeTextValue(tag, maxTagLength);
+    if (!normalizedTag || uniqueTags.includes(normalizedTag)) return;
+    if (uniqueTags.length < maxTags) {
+      uniqueTags.push(normalizedTag);
+    }
+  });
+
+  return uniqueTags;
+}
+
+function normalizeEvacuationValue(value) {
+  return value === "full" ? "full" : "partial";
+}
+
 function normalizeTimestampValue(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -718,8 +753,8 @@ function normalizeImportedRecord(record) {
     return {
       type,
       timestamp,
-      pain: parseNumberValue(record.pain, 0),
-      bloating: parseNumberValue(record.bloating, 0)
+      pain: clampNumberValue(record.pain, 0, 5, 0),
+      bloating: clampNumberValue(record.bloating, 0, 5, 0)
     };
   }
 
@@ -727,27 +762,26 @@ function normalizeImportedRecord(record) {
     return {
       type,
       timestamp,
-      tags: Array.isArray(record.tags) ? record.tags.filter(Boolean) : [],
-      bristolScale: parseNumberValue(record["bristol-scale"] ?? record.bristolScale, 0),
-      evacuation: record.evacuation === "full" ? "full" : "partial",
-      pressure: parseNumberValue(record.pressure, 0),
-      wetness: parseNumberValue(record.wetness, 0)
+      tags: normalizeTagListValue(record.tags),
+      bristolScale: clampNumberValue(record["bristol-scale"] ?? record.bristolScale, 1, 7, 1),
+      evacuation: normalizeEvacuationValue(record.evacuation),
+      pressure: clampNumberValue(record.pressure, 0, 5, 0),
+      wetness: clampNumberValue(record.wetness, 0, 5, 0)
     };
   }
 
   if (type === "food_log") {
+    const foodName = normalizeTextValue(record.foodName || record.text || "", 120);
     return {
       type,
       timestamp,
-      foodName: String(record.foodName || record.text || "").trim(),
+      foodName,
       foodTags: Array.isArray(record.tags)
-        ? record.tags.filter(Boolean)
-        : Array.isArray(record.foodTags)
-          ? record.foodTags.filter(Boolean)
-          : [],
-      speed: parseNumberValue(record.speed, 0),
-      size: parseNumberValue(record.size, 0),
-      risk: parseNumberValue(record.risk, 0)
+        ? normalizeTagListValue(record.tags)
+        : normalizeTagListValue(record.foodTags),
+      speed: clampNumberValue(record.speed, 0, 5, 0),
+      size: clampNumberValue(record.size, 0, 5, 0),
+      risk: clampNumberValue(record.risk, 0, 5, 0)
     };
   }
 
@@ -896,7 +930,7 @@ function buildFoodDetails(entry, showAllTags) {
   if (cleanTags.length > 0) {
     const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
     const suffix = !showAllTags && cleanTags.length > 5 ? ", ..." : "";
-    details.push(`Tags: ${visibleTags.join(", ")}${suffix}`);
+    details.push(`Zutaten: ${visibleTags.join(", ")}${suffix}`);
   }
 
   return details.join(" | ");
@@ -1057,7 +1091,7 @@ function renderFoodEditor(card, entry, records, entryIndex) {
   const foodTagsInput = document.createElement("input");
   foodTagsInput.type = "text";
   foodTagsInput.value = Array.isArray(entry.foodTags) ? entry.foodTags.join(", ") : "";
-  appendField(card, "Tags", foodTagsInput);
+  appendField(card, "Zutaten", foodTagsInput);
 
   card.appendChild(createButton("Speichern", () => {
     entry.foodName = foodNameInput.value.trim();
@@ -1209,9 +1243,16 @@ function initBristolScale() {
     button.appendChild(label);
 
     button.onclick = () => {
-      hidden.value = value;
-      container.querySelectorAll("button").forEach(item => item.classList.remove("selected"));
-      button.classList.add("selected");
+      const isSelected = button.classList.contains("selected");
+
+      if (isSelected) {
+        hidden.value = 0;
+        button.classList.remove("selected");
+      } else {
+        hidden.value = value;
+        container.querySelectorAll("button").forEach(item => item.classList.remove("selected"));
+        button.classList.add("selected");
+      }
     };
 
     container.appendChild(button);
@@ -1277,7 +1318,7 @@ function addFoodFromList() {
 
   const tagsInput = document.createElement("input");
   tagsInput.type = "text";
-  tagsInput.placeholder = "Tags (Komma getrennt)";
+  tagsInput.placeholder = "Zutaten (Komma getrennt)";
   addCard.appendChild(tagsInput);
   addCard.appendChild(document.createElement("br"));
 
