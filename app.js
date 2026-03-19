@@ -1,6 +1,12 @@
 const STORAGE_KEYS = {
   records: "ibs-records",
-  foods: "ibs-foods"
+  foods: "ibs-foods",
+  foodSortMode: "ibs-food-sort-mode"
+};
+
+const FOOD_SORT_MODES = {
+  name: "name",
+  newest: "newest"
 };
 
 const NAV_CONFIG = {
@@ -13,137 +19,39 @@ let appInitialized = false;
 let historyCalendarVisible = false;
 let historyCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let historySelectedDateKey = null;
+let historyVisibleCount = 10;
+let lastSelectedFoodSuggestion = "";
 
-function byId(id) {
-  return document.getElementById(id);
-}
-
-function readStoredArray(key) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeStoredArray(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function parseTagList(value) {
-  return value
-    .split(",")
-    .map(tag => tag.trim())
-    .filter(Boolean);
-}
-
-function createButton(text, onClick, options = {}) {
-  const button = document.createElement("button");
-  button.type = options.type || "button";
-  button.textContent = text;
-  if (options.className) button.className = options.className;
-  if (options.title) button.title = options.title;
-  if (options.ariaLabel) button.setAttribute("aria-label", options.ariaLabel);
-  button.onclick = onClick;
-  return button;
-}
-
-function appendField(container, labelText, control) {
-  container.appendChild(document.createTextNode(`${labelText}: `));
-  container.appendChild(control);
-  container.appendChild(document.createElement("br"));
-}
-
-function createNumberSelect(min, max, selectedValue) {
-  const select = document.createElement("select");
-  for (let value = min; value <= max; value++) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
-    if (value === selectedValue) option.selected = true;
-    select.appendChild(option);
-  }
-  return select;
-}
-
-function createChoiceSelect(options, selectedValue, labelMap = {}) {
-  const select = document.createElement("select");
-  options.forEach(value => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = labelMap[value] || value;
-    if (value === selectedValue) option.selected = true;
-    select.appendChild(option);
-  });
-  return select;
-}
-
-function formatLocalDateTimeValue(timestamp) {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}`;
-}
-
-function createDateTimeInput(timestamp) {
-  const input = document.createElement("input");
-  input.type = "datetime-local";
-  input.value = formatLocalDateTimeValue(timestamp);
-  return input;
-}
-
-function updateEntryTimestamp(entry, dateInput) {
-  if (!dateInput.value) return;
-
-  const updatedTimestamp = new Date(dateInput.value).toISOString();
-  if (updatedTimestamp !== entry.timestamp) {
-    entry.timestamp = updatedTimestamp;
-  }
-}
-
-function createCardActions(actionsConfig) {
-  const actions = document.createElement("div");
-  actions.className = "card-actions";
-
-  actionsConfig.forEach(config => {
-    actions.appendChild(createButton(config.text, config.onClick, config.options));
-  });
-
-  return actions;
-}
-
-function buildTagContainer(tags, showAllTags) {
-  const cleanTags = Array.isArray(tags) ? tags.filter(Boolean) : [];
-  if (cleanTags.length === 0) return null;
-
-  const tagsDiv = document.createElement("div");
-  const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
-
-  visibleTags.forEach(tag => {
-    const span = document.createElement("span");
-    span.className = "tag";
-    span.textContent = tag;
-    tagsDiv.appendChild(span);
-  });
-
-  if (!showAllTags && cleanTags.length > 5) {
-    const span = document.createElement("span");
-    span.className = "tag";
-    span.textContent = "...";
-    tagsDiv.appendChild(span);
-  }
-
-  return tagsDiv;
-}
-
-function getSortedFoods() {
-  return getFoods().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-}
+const HISTORY_PAGE_SIZE = 10;
 
 function getSortedRecords() {
   return getRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function getRecordSortDate(record) {
+  const createdAt = new Date(record?.createdAt || "");
+  if (!Number.isNaN(createdAt.getTime())) {
+    return createdAt;
+  }
+
+  return new Date(record?.timestamp || 0);
+}
+
+function compareRecordsByCreatedAtDescending(recordA, recordB) {
+  const createdAtDifference = getRecordSortDate(recordB) - getRecordSortDate(recordA);
+  if (createdAtDifference !== 0) {
+    return createdAtDifference;
+  }
+
+  return new Date(recordB?.timestamp || 0) - new Date(recordA?.timestamp || 0);
+}
+
+function getHistorySortedRecords() {
+  return getRecords().sort(compareRecordsByCreatedAtDescending);
+}
+
+function compareRecordTimestampsAscending(recordA, recordB) {
+  return new Date(recordA.timestamp) - new Date(recordB.timestamp);
 }
 
 function getEntryIndexByTimestamp(records, timestamp) {
@@ -203,243 +111,6 @@ function refreshEditedEntry(records, previousTimestamp, updatedEntry) {
   }
 }
 
-function findFoodCard(foodId) {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return null;
-
-  return Array.from(savedFoodsList.querySelectorAll(".card")).find(card => card.dataset.foodId === String(foodId)) || null;
-}
-
-function getLocalDateParts(timestamp) {
-  const date = new Date(timestamp);
-  return {
-    year: date.getFullYear(),
-    month: date.getMonth(),
-    day: date.getDate()
-  };
-}
-
-function getLocalDateKey(timestamp) {
-  const parts = getLocalDateParts(timestamp);
-  return `${parts.year}-${padNumber(parts.month + 1)}-${padNumber(parts.day)}`;
-}
-
-function getMonthStart(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function formatHistoryMonthLabel(date) {
-  return date.toLocaleDateString("de-DE", {
-    month: "long",
-    year: "numeric"
-  });
-}
-
-function getHistoryCalendarDayName(index) {
-  return ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index];
-}
-
-function buildDaySeveritySummary(dayInfo) {
-  if (!dayInfo || dayInfo.totalEntries === 0) {
-    return "Keine Einträge";
-  }
-
-  const details = [];
-  if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh ≥3`);
-  if (dayInfo.painMediumCount > 0) details.push(`${dayInfo.painMediumCount}× Bauchweh 2`);
-  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1/7`);
-  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5/6`);
-  if (details.length === 0) details.push("Unauffällig");
-  return details.join(" | ");
-}
-
-function classifyDaySeverity(dayInfo) {
-  if (!dayInfo || dayInfo.totalEntries === 0) {
-    return "neutral";
-  }
-
-  if (dayInfo.painHighCount >= 2 || dayInfo.bristolHighCount >= 1 || dayInfo.score >= 4 || dayInfo.bristolMediumCount >= 3) {
-    return "severe";
-  }
-
-  if (dayInfo.painHighCount >= 1 || dayInfo.bristolMediumCount >= 1 || dayInfo.score >= 2) {
-    return "medium";
-  }
-
-  if (dayInfo.score > 0) {
-    return "mild";
-  }
-
-  return "neutral";
-}
-
-function buildHistoryDayMap(records) {
-  const dayMap = new Map();
-
-  records.forEach(record => {
-    if (!record || !record.timestamp) return;
-
-    const key = getLocalDateKey(record.timestamp);
-    if (!dayMap.has(key)) {
-      dayMap.set(key, {
-        totalEntries: 0,
-        painHighCount: 0,
-        painMediumCount: 0,
-        bristolHighCount: 0,
-        bristolMediumCount: 0,
-        score: 0
-      });
-    }
-
-    const dayInfo = dayMap.get(key);
-    dayInfo.totalEntries += 1;
-
-    if (record.type === "symptoms") {
-      const pain = parseNumberValue(record.pain, 0);
-      const bloating = parseNumberValue(record.bloating, 0);
-
-      if (pain >= 3) {
-        dayInfo.painHighCount += 1;
-        dayInfo.score += pain >= 4 ? 3 : 2;
-      } else if (pain === 2) {
-        dayInfo.painMediumCount += 1;
-        dayInfo.score += 1;
-      }
-
-      if (bloating >= 3) {
-        dayInfo.score += 1;
-      } else if (bloating === 2) {
-        dayInfo.score += 0.5;
-      }
-    }
-
-    if (record.type === "bm") {
-      const bristol = parseNumberValue(record.bristolScale, 0);
-      if(bristol === 1 || bristol ===7){
-        dayInfo.bristolHighCount += 1;
-        dayInfo.score += 3;
-      }
-      else if (bristol > 4||bristol < 3)  {
-       dayInfo.bristolMediumCount += 1;
-        dayInfo.score += 2;
-      } 
-      
-    }
-  });
-
-  return dayMap;
-}
-
-function createCalendarDayCell(label, className) {
-  const cell = document.createElement("div");
-  cell.className = className;
-  cell.textContent = label;
-  return cell;
-}
-
-function getHistoryRecordsForSelectedDay() {
-  const records = getSortedRecords();
-  if (!historyCalendarVisible) {
-    return records;
-  }
-
-  if (!historySelectedDateKey) {
-    return [];
-  }
-
-  return records.filter(record => getLocalDateKey(record.timestamp) === historySelectedDateKey);
-}
-
-function getHistoryEmptyMessage() {
-  if (historyCalendarVisible && !historySelectedDateKey) {
-    return "Wähle einen Tag im Kalender aus.";
-  }
-
-  if (historyCalendarVisible && historySelectedDateKey) {
-    return "Keine Einträge für diesen Tag.";
-  }
-
-  return "Noch keine Einträge vorhanden.";
-}
-
-function renderHistoryCalendar() {
-  const container = byId("historyCalendarContainer");
-  const grid = byId("historyCalendarGrid");
-  const monthLabel = byId("historyCalendarMonthLabel");
-  const toggleButton = byId("historyCalendarToggle");
-  if (!container || !grid || !monthLabel || !toggleButton) return;
-
-  container.style.display = historyCalendarVisible ? "block" : "none";
-  toggleButton.classList.toggle("active", historyCalendarVisible);
-  if (!historyCalendarVisible) return;
-
-  const monthDate = getMonthStart(historyCalendarDate);
-  historyCalendarDate = monthDate;
-  monthLabel.textContent = formatHistoryMonthLabel(monthDate);
-  grid.innerHTML = "";
-
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const dayNameCell = createCalendarDayCell(getHistoryCalendarDayName(dayIndex), "calendar-cell calendar-weekday");
-    grid.appendChild(dayNameCell);
-  }
-
-  const records = getRecords();
-  const dayMap = buildHistoryDayMap(records);
-  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
-
-  for (let index = 0; index < leadingEmptyDays; index++) {
-    grid.appendChild(createCalendarDayCell("", "calendar-cell calendar-day is-empty"));
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const cell = document.createElement("div");
-    const dateKey = `${monthDate.getFullYear()}-${padNumber(monthDate.getMonth() + 1)}-${padNumber(day)}`;
-    const dayInfo = dayMap.get(dateKey) || { totalEntries: 0, painHighCount: 0, painMediumCount: 0, bristolHighCount: 0, bristolMediumCount: 0, score: 0 };
-    const severity = classifyDaySeverity(dayInfo);
-
-    cell.className = `calendar-cell calendar-day severity-${severity}`;
-    if (historySelectedDateKey === dateKey) {
-      cell.classList.add("is-selected");
-    }
-
-    const dayNumber = document.createElement("div");
-    dayNumber.className = "calendar-day-number";
-    dayNumber.textContent = day;
-    cell.appendChild(dayNumber);
-
-    if (dayInfo.totalEntries > 0) {
-      const meta = document.createElement("div");
-      meta.className = "calendar-day-meta";
-      meta.textContent = `${dayInfo.totalEntries}×`;
-      cell.appendChild(meta);
-    }
-
-    cell.title = buildDaySeveritySummary(dayInfo);
-    cell.onclick = () => {
-      historySelectedDateKey = historySelectedDateKey === dateKey ? null : dateKey;
-      renderHistoryCalendar();
-      renderHistoryLog();
-    };
-    grid.appendChild(cell);
-  }
-}
-
-function toggleHistoryCalendar() {
-  historyCalendarVisible = !historyCalendarVisible;
-  if (!historyCalendarVisible) {
-    historySelectedDateKey = null;
-  }
-  renderHistoryCalendar();
-  renderHistoryLog();
-}
-
-function changeHistoryCalendarMonth(offset) {
-  historyCalendarDate = new Date(historyCalendarDate.getFullYear(), historyCalendarDate.getMonth() + offset, 1);
-  renderHistoryCalendar();
-}
-
 function setActiveView(viewName) {
   Object.entries(NAV_CONFIG).forEach(([name, config]) => {
     const button = byId(config.buttonId);
@@ -452,6 +123,9 @@ function setActiveView(viewName) {
 
   const activeConfig = NAV_CONFIG[viewName];
   if (activeConfig && typeof activeConfig.onShow === "function") {
+    if (viewName === "history") {
+      resetHistoryVisibleCount();
+    }
     activeConfig.onShow();
   }
 
@@ -466,185 +140,10 @@ function initNavigation() {
   });
 }
 
-function getFoodSuggestions(value, foods) {
-  const uniqueNames = Array.from(new Set(foods.map(food => food.name)));
-
-  if (!value) {
-    const recentNames = [];
-    for (let index = foods.length - 1; index >= 0 && recentNames.length < 4; index--) {
-      const name = foods[index].name;
-      if (name && !recentNames.includes(name)) {
-        recentNames.push(name);
-      }
-    }
-    return recentNames;
-  }
-
-  return uniqueNames.filter(name => name.toLowerCase().includes(value));
-}
-
-function showFoodSuggestions() {
-  const input = byId("foodText");
-  const suggestionsDiv = byId("foodSuggestions");
-  if (!input || !suggestionsDiv) return;
-
-  const value = input.value.trim().toLowerCase();
-  const foods = getFoods().filter(food => food.name && food.name.trim() !== "");
-  const suggestions = getFoodSuggestions(value, foods);
-
-  if (suggestions.length === 0) {
-    suggestionsDiv.style.display = "none";
-    suggestionsDiv.innerHTML = "";
-    return;
-  }
-
-  suggestionsDiv.innerHTML = "";
-  suggestions.forEach(name => {
-    const item = document.createElement("div");
-    item.className = "suggestion-item";
-    item.textContent = name;
-    item.onclick = function() {
-      input.value = name;
-      const selectedFood = foods.find(food => food.name.toLowerCase() === name.toLowerCase());
-      const tagsInput = byId("tags");
-      if (selectedFood && selectedFood.tags && tagsInput) {
-        tagsInput.value = selectedFood.tags.filter(Boolean).join(", ");
-      }
-      suggestionsDiv.style.display = "none";
-    };
-    suggestionsDiv.appendChild(item);
-  });
-
-  suggestionsDiv.style.display = "block";
-}
-
-function hideFoodSuggestionsOnOutsideClick(event) {
-  const suggestionsDiv = byId("foodSuggestions");
-  const input = byId("foodText");
-  if (!suggestionsDiv || !input) return;
-
-  if (event.target !== input && !suggestionsDiv.contains(event.target)) {
-    suggestionsDiv.style.display = "none";
-  }
-}
-
-function createFoodCard(food) {
-  const card = document.createElement("div");
-  card.className = "card";
-  card.dataset.foodId = String(food.id);
-
-  const title = document.createElement("h3");
-  title.textContent = food.name || "Essen";
-  card.appendChild(title);
-
-  const detailsDiv = document.createElement("div");
-  detailsDiv.className = "labels";
-  const details = [];
-  if (Array.isArray(food.tags) && food.tags.length > 0) {
-    details.push(`Zutaten: ${food.tags.filter(Boolean).join(", ")}`);
-  }
-  detailsDiv.textContent = details.join(" | ");
-  card.appendChild(detailsDiv);
-
-  card.appendChild(createCardActions([
-    {
-      text: "✏",
-      onClick: event => editFoodItem(food.id, event),
-      options: { title: "Bearbeiten", ariaLabel: "Bearbeiten" }
-    },
-    {
-      text: "X",
-      onClick: () => deleteFoodItem(food.id)
-    }
-  ]));
-
-  return card;
-}
-
-function renderSavedFoods() {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return;
-
-  savedFoodsList.innerHTML = "";
-  const foods = getSortedFoods();
-
-  if (foods.length === 0) {
-    savedFoodsList.textContent = "Noch keine Essen gespeichert.";
-    return;
-  }
-
-  foods.forEach(food => {
-    savedFoodsList.appendChild(createFoodCard(food));
-  });
-}
-
-function editFoodItem(foodId, event) {
-  const foods = getFoods();
-  const foodIndex = foods.findIndex(food => food.id === foodId);
-  if (foodIndex === -1) return;
-
-  const food = foods[foodIndex];
-  const currentCard = event && event.target ? event.target.closest(".card") : findFoodCard(foodId);
-  if (!currentCard) return;
-
-  const card = document.createElement("div");
-  card.className = "card";
-  card.dataset.foodId = String(food.id);
-
-  const title = document.createElement("h3");
-  title.textContent = "Food bearbeiten";
-  card.appendChild(title);
-
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
-  nameInput.value = food.name || "";
-  appendField(card, "Name", nameInput);
-
-  const tagsInput = document.createElement("input");
-  tagsInput.type = "text";
-  tagsInput.value = Array.isArray(food.tags) ? food.tags.join(", ") : "";
-  appendField(card, "Zutaten", tagsInput);
-
-  card.appendChild(createButton("Speichern", () => {
-    const updatedName = nameInput.value.trim();
-    if (!updatedName) {
-      alert("Essen braucht einen Namen.");
-      return;
-    }
-
-    foods[foodIndex].name = updatedName;
-    foods[foodIndex].tags = parseTagList(tagsInput.value);
-    saveFoods(foods);
-    card.replaceWith(createFoodCard(foods[foodIndex]));
-  }));
-
-  card.appendChild(createButton("Abbrechen", () => {
-    card.replaceWith(createFoodCard(food));
-  }, {
-    className: "secondary-button"
-  }));
-
-  currentCard.replaceWith(card);
-}
-
-function deleteFoodItem(foodId) {
-  if (!confirm("Möchtest du dieses Food wirklich löschen?")) return;
-
-  const remainingFoods = getFoods().filter(food => food.id !== foodId);
-  saveFoods(remainingFoods);
-  renderSavedFoods();
-}
-
-function renderHistoryLog() {
-  renderUnifiedLog("historyLog", {
-    records: getHistoryRecordsForSelectedDay(),
-    emptyMessage: getHistoryEmptyMessage()
-  });
-  renderHistoryCalendar();
-}
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
+if ("serviceWorker" in navigator && supportsPwaFeatures()) {
+  navigator.serviceWorker
+    .register("service-worker.js", { updateViaCache: "none" })
+    .catch(() => {});
 }
 
 function getRecords() {
@@ -661,141 +160,6 @@ function getFoods() {
 
 function saveFoods(foods) {
   writeStoredArray(STORAGE_KEYS.foods, foods);
-}
-
-function generateId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function padNumber(value) {
-  return String(value).padStart(2, "0");
-}
-
-function formatRecordForExport(record) {
-  const exportedRecord = {
-    type: record.type,
-    timestamp: record.timestamp
-  };
-
-  if (record.type === "food_log") {
-    const foodName = record.foodName || record.text || "";
-    const foodTags = Array.isArray(record.foodTags) ? record.foodTags.filter(Boolean) : [];
-    if (record.speed && record.speed !== 0) exportedRecord.speed = record.speed;
-    if (foodTags.length > 0) exportedRecord.tags = foodTags;
-    exportedRecord.text = foodName || "";
-    if (record.size && record.size !== 0) exportedRecord.size = record.size;
-    if (record.risk !== undefined && record.risk !== 0) exportedRecord.risk = record.risk;
-  } else if (record.type === "bm") {
-    exportedRecord.tags = Array.isArray(record.tags) ? record.tags.filter(Boolean) : [];
-    exportedRecord["bristol-scale"] = record.bristolScale;
-    exportedRecord.evacuation = record.evacuation;
-    if (record.wetness && record.wetness !== 0) exportedRecord.wetness = record.wetness;
-    if (record.pressure !== undefined && record.pressure !== 0) exportedRecord.pressure = record.pressure;
-  } else if (record.type === "symptoms") {
-    if (record.pain && record.pain !== 0) exportedRecord.pain = record.pain;
-    if (record.bloating && record.bloating !== 0) exportedRecord.bloating = record.bloating;
-  }
-
-  return exportedRecord;
-}
-
-function parseNumberValue(value, fallback = 0) {
-  const parsedValue = Number.parseInt(value, 10);
-  return Number.isNaN(parsedValue) ? fallback : parsedValue;
-}
-
-function clampNumberValue(value, min, max, fallback = min) {
-  const parsedValue = parseNumberValue(value, fallback);
-  return Math.min(max, Math.max(min, parsedValue));
-}
-
-function normalizeTextValue(value, maxLength = 120) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim().slice(0, maxLength);
-}
-
-function normalizeTagListValue(value, options = {}) {
-  const maxTags = options.maxTags || 20;
-  const maxTagLength = options.maxTagLength || 30;
-  if (!Array.isArray(value)) return [];
-
-  const uniqueTags = [];
-  value.forEach(tag => {
-    const normalizedTag = normalizeTextValue(tag, maxTagLength);
-    if (!normalizedTag || uniqueTags.includes(normalizedTag)) return;
-    if (uniqueTags.length < maxTags) {
-      uniqueTags.push(normalizedTag);
-    }
-  });
-
-  return uniqueTags;
-}
-
-function normalizeEvacuationValue(value) {
-  return value === "full" ? "full" : "partial";
-}
-
-function normalizeTimestampValue(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString();
-}
-
-function normalizeImportedRecord(record) {
-  if (!record || typeof record !== "object") return null;
-
-  const type = record.type;
-  const timestamp = normalizeTimestampValue(record.timestamp);
-  if (!type || !timestamp) return null;
-
-  if (type === "symptoms") {
-    return {
-      type,
-      timestamp,
-      pain: clampNumberValue(record.pain, 0, 5, 0),
-      bloating: clampNumberValue(record.bloating, 0, 5, 0)
-    };
-  }
-
-  if (type === "bm") {
-    return {
-      type,
-      timestamp,
-      tags: normalizeTagListValue(record.tags),
-      bristolScale: clampNumberValue(record["bristol-scale"] ?? record.bristolScale, 1, 7, 1),
-      evacuation: normalizeEvacuationValue(record.evacuation),
-      pressure: clampNumberValue(record.pressure, 0, 5, 0),
-      wetness: clampNumberValue(record.wetness, 0, 5, 0)
-    };
-  }
-
-  if (type === "food_log") {
-    const foodName = normalizeTextValue(record.foodName || record.text || "", 120);
-    return {
-      type,
-      timestamp,
-      foodName,
-      foodTags: Array.isArray(record.tags)
-        ? normalizeTagListValue(record.tags)
-        : normalizeTagListValue(record.foodTags),
-      speed: clampNumberValue(record.speed, 0, 5, 0),
-      size: clampNumberValue(record.size, 0, 5, 0),
-      risk: clampNumberValue(record.risk, 0, 5, 0)
-    };
-  }
-
-  return null;
-}
-
-function getRecordSignature(record) {
-  return JSON.stringify(formatRecordForExport(record));
-}
-
-function extractImportedRecords(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload["ibs-records"])) return payload["ibs-records"];
-  return null;
 }
 
 function syncFoodsFromImportedRecords(importedRecords) {
@@ -998,7 +362,11 @@ function renderUnifiedLog(targetElementId, options = {}) {
 
   container.innerHTML = "";
   const data = Array.isArray(options.records) ? options.records : getSortedRecords();
-  const maxItems = targetElementId === "log" ? 5 : data.length;
+  const maxItems = Number.isInteger(options.maxItems)
+    ? options.maxItems
+    : targetElementId === "log"
+      ? 5
+      : data.length;
   const visibleEntries = data.slice(0, maxItems);
 
   if (targetElementId === "historyLog" && visibleEntries.length === 0) {
@@ -1019,6 +387,15 @@ function renderUnifiedLog(targetElementId, options = {}) {
     moreCard.appendChild(createButton("Mehr sehen (History)", () => {
       const navHistory = byId("navHistory");
       if (navHistory) navHistory.click();
+    }));
+    container.appendChild(moreCard);
+  }
+
+  if (typeof options.onLoadMore === "function" && data.length > maxItems) {
+    const moreCard = document.createElement("div");
+    moreCard.className = "card";
+    moreCard.appendChild(createButton(options.loadMoreLabel || "Mehr laden", options.onLoadMore, {
+      className: "secondary-button"
     }));
     container.appendChild(moreCard);
   }
@@ -1206,9 +583,11 @@ function resetFoodForm() {
   resetScaleGroup("speedScale", "speed", 0);
   resetScaleGroup("sizeScale", "size", 0);
   resetScaleGroup("riskScale", "risk", 0);
+  lastSelectedFoodSuggestion = "";
   byId("foodText").value = "";
   byId("tags").value = "";
   byId("foodDate").value = "";
+  hideFoodSuggestions();
 }
 
 function initScales() {
@@ -1266,6 +645,7 @@ function savePainBloating() {
   const record = {
     type: "symptoms",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     pain: parseInt(byId("pain").value, 10),
     bloating: parseInt(byId("bloating").value, 10)
   };
@@ -1282,6 +662,7 @@ function saveBM() {
   const record = {
     type: "bm",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     bristolScale: parseInt(byId("bristol").value, 10),
     evacuation: byId("evacuation").value,
     pressure: parseInt(byId("pressure").value, 10),
@@ -1293,65 +674,6 @@ function saveBM() {
   saveRecords(records);
   renderUnifiedLog("log");
   resetBmForm();
-}
-
-function addFoodFromList() {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return;
-
-  const existingCard = byId("addFoodCard");
-  if (existingCard) existingCard.remove();
-
-  const addCard = document.createElement("div");
-  addCard.className = "card";
-  addCard.id = "addFoodCard";
-
-  const title = document.createElement("h3");
-  title.textContent = "Neues Food hinzufügen";
-  addCard.appendChild(title);
-
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
-  nameInput.placeholder = "Food Name";
-  addCard.appendChild(nameInput);
-  addCard.appendChild(document.createElement("br"));
-
-  const tagsInput = document.createElement("input");
-  tagsInput.type = "text";
-  tagsInput.placeholder = "Zutaten (Komma getrennt)";
-  addCard.appendChild(tagsInput);
-  addCard.appendChild(document.createElement("br"));
-
-  addCard.appendChild(createButton("Speichern", () => {
-    const name = nameInput.value.trim();
-    if (!name) {
-      alert("Essen braucht einen Namen.");
-      return;
-    }
-
-    const tags = parseTagList(tagsInput.value);
-    const foods = getFoods();
-    if (foods.find(food => food.name.toLowerCase() === name.toLowerCase())) {
-      alert("Essen existiert bereits.");
-      return;
-    }
-
-    foods.push({
-      id: generateId(),
-      name,
-      tags,
-      createdAt: new Date().toISOString()
-    });
-    saveFoods(foods);
-    addCard.remove();
-    renderSavedFoods();
-  }));
-
-  addCard.appendChild(createButton("Abbrechen", () => addCard.remove(), {
-    className: "secondary-button"
-  }));
-
-  savedFoodsList.prepend(addCard);
 }
 
 function saveFood() {
@@ -1385,6 +707,7 @@ function saveFood() {
   const record = {
     type: "food_log",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     foodName: name,
     foodTags: tags,
     speed,
@@ -1404,7 +727,9 @@ function initApp() {
   if (appInitialized) return;
   appInitialized = true;
 
+  ensureManifestLink();
   initNavigation();
+  updateFoodSortButton();
   const importInput = byId("importRecordsInput");
   if (importInput) {
     importInput.addEventListener("change", handleImportRecordsSelection);

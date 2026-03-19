@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="stylesheet" href="style.css">
-<link rel="manifest" href="manifest.json">
 <title>IBS Tracker</title>
 </head>
 <body>
@@ -104,6 +103,7 @@
       <span class="calendar-legend-item"><span class="calendar-legend-color mild"></span>Mild</span>
       <span class="calendar-legend-item"><span class="calendar-legend-color medium"></span>Mittel</span>
       <span class="calendar-legend-item"><span class="calendar-legend-color severe"></span>Stark</span>
+      <span class="calendar-legend-item"><span class="calendar-legend-color very-severe"></span>Sehr stark</span>
     </div>
     <div id="historyCalendarGrid" class="calendar-grid"></div>
   </div>
@@ -111,8 +111,11 @@
 </section>
 
 <section id="FoodSection" style="display:none;">
-  <div class="section-header">
+  <div class="section-header history-header">
     <h2>Gespeichertes Essen</h2>
+  </div>
+  <div class="history-actions food-actions">
+    <button id="foodSortToggle" class="secondary-button" onclick="toggleFoodSortMode()">Sortierung: Name</button>
     <button class="secondary-button" onclick="addFoodFromList()">+ Hinzufügen</button>
   </div>
   <div id="savedFoodsList"></div>
@@ -120,6 +123,11 @@
 </section>
 
 <input type="file" id="importRecordsInput" accept="application/json,.json" style="display:none;">
+<script src="core-utils.js"></script>
+<script src="record-utils.js"></script>
+<script src="food-utils.js"></script>
+<script src="history-utils.js"></script>
 <script src="app.js"></script>
+<script src="monthly-wrapped.js"></script>
 </body>
 </html>
