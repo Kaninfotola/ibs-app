@@ -136,6 +136,21 @@ h2 {
   margin: 0;
 }
 
+.food-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.food-actions .secondary-button {
+  width: 160px;
+  min-height: 40px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .history-header {
   justify-content: flex-start;
   margin-bottom: 8px;
@@ -267,6 +282,10 @@ button:hover {
   background: #e78daa;
 }
 
+.calendar-legend-color.very-severe {
+  background: #cf4d72;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -340,6 +359,21 @@ button:hover {
 .calendar-day.severity-severe {
   background: #f2a6bd;
   border-color: #de89a5;
+}
+
+.calendar-day.severity-very-severe {
+  background: #cf4d72;
+  border-color: #ac3458;
+}
+
+.calendar-day.severity-very-severe .calendar-day-number,
+.calendar-day.severity-very-severe .calendar-day-meta {
+  color: #fff;
+}
+
+.calendar-day.severity-very-severe .calendar-day-meta {
+  background: rgba(97, 15, 40, 0.32);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .calendar-day.is-selected {

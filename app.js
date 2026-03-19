@@ -1,6 +1,12 @@
 const STORAGE_KEYS = {
   records: "ibs-records",
-  foods: "ibs-foods"
+  foods: "ibs-foods",
+  foodSortMode: "ibs-food-sort-mode"
+};
+
+const FOOD_SORT_MODES = {
+  name: "name",
+  newest: "newest"
 };
 
 const NAV_CONFIG = {
@@ -13,6 +19,10 @@ let appInitialized = false;
 let historyCalendarVisible = false;
 let historyCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let historySelectedDateKey = null;
+let historyVisibleCount = 10;
+let lastSelectedFoodSuggestion = "";
+
+const HISTORY_PAGE_SIZE = 10;
 
 function byId(id) {
   return document.getElementById(id);
@@ -29,6 +39,15 @@ function readStoredArray(key) {
 
 function writeStoredArray(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readStoredValue(key, fallback = "") {
+  const value = localStorage.getItem(key);
+  return value === null ? fallback : value;
+}
+
+function writeStoredValue(key, value) {
+  localStorage.setItem(key, value);
 }
 
 function parseTagList(value) {
@@ -138,12 +157,95 @@ function buildTagContainer(tags, showAllTags) {
   return tagsDiv;
 }
 
+function compareFoodNames(foodA, foodB) {
+  const nameA = (foodA?.name || "").trim();
+  const nameB = (foodB?.name || "").trim();
+  const nameComparison = nameA.localeCompare(nameB, "de", { sensitivity: "base" });
+
+  if (nameComparison !== 0) {
+    return nameComparison;
+  }
+
+  return new Date(foodA?.createdAt || 0) - new Date(foodB?.createdAt || 0);
+}
+
+function compareFoodNewestFirst(foodA, foodB) {
+  return new Date(foodB?.createdAt || 0) - new Date(foodA?.createdAt || 0);
+}
+
+function getFoodSortMode() {
+  const sortMode = readStoredValue(STORAGE_KEYS.foodSortMode, FOOD_SORT_MODES.name);
+  return Object.values(FOOD_SORT_MODES).includes(sortMode) ? sortMode : FOOD_SORT_MODES.name;
+}
+
+function setFoodSortMode(sortMode) {
+  const nextSortMode = Object.values(FOOD_SORT_MODES).includes(sortMode) ? sortMode : FOOD_SORT_MODES.name;
+  writeStoredValue(STORAGE_KEYS.foodSortMode, nextSortMode);
+}
+
+function getNextFoodSortMode(sortMode) {
+  return sortMode === FOOD_SORT_MODES.name ? FOOD_SORT_MODES.newest : FOOD_SORT_MODES.name;
+}
+
+function getFoodSortButtonLabel(sortMode) {
+  return sortMode === FOOD_SORT_MODES.newest ? "Sortierung: Neueste" : "Sortierung: Name";
+}
+
+function updateFoodSortButton() {
+  const sortButton = byId("foodSortToggle");
+  if (!sortButton) return;
+
+  const sortMode = getFoodSortMode();
+  sortButton.textContent = getFoodSortButtonLabel(sortMode);
+  sortButton.setAttribute("aria-label", getFoodSortButtonLabel(sortMode));
+  sortButton.title = `Aktuell ${getFoodSortButtonLabel(sortMode)}`;
+}
+
+function toggleFoodSortMode() {
+  const nextSortMode = getNextFoodSortMode(getFoodSortMode());
+  setFoodSortMode(nextSortMode);
+  renderSavedFoods();
+}
+
 function getSortedFoods() {
-  return getFoods().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const sortMode = getFoodSortMode();
+  const foods = getFoods();
+
+  if (sortMode === FOOD_SORT_MODES.newest) {
+    return foods.sort(compareFoodNewestFirst);
+  }
+
+  return foods.sort(compareFoodNames);
 }
 
 function getSortedRecords() {
   return getRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function getRecordSortDate(record) {
+  const createdAt = new Date(record?.createdAt || "");
+  if (!Number.isNaN(createdAt.getTime())) {
+    return createdAt;
+  }
+
+  return new Date(record?.timestamp || 0);
+}
+
+function compareRecordsByCreatedAtDescending(recordA, recordB) {
+  const createdAtDifference = getRecordSortDate(recordB) - getRecordSortDate(recordA);
+  if (createdAtDifference !== 0) {
+    return createdAtDifference;
+  }
+
+  return new Date(recordB?.timestamp || 0) - new Date(recordA?.timestamp || 0);
+}
+
+function getHistorySortedRecords() {
+  return getRecords().sort(compareRecordsByCreatedAtDescending);
+}
+
+function compareRecordTimestampsAscending(recordA, recordB) {
+  return new Date(recordA.timestamp) - new Date(recordB.timestamp);
 }
 
 function getEntryIndexByTimestamp(records, timestamp) {
@@ -245,10 +347,13 @@ function buildDaySeveritySummary(dayInfo) {
   }
 
   const details = [];
-  if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh ≥3`);
+  if (dayInfo.painLowCount > 0) details.push(`${dayInfo.painLowCount}× Bauchweh 1`);
+  if (dayInfo.painVeryHighCount > 0) details.push(`${dayInfo.painVeryHighCount}× Bauchweh ≥4`);
+  if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh 3`);
   if (dayInfo.painMediumCount > 0) details.push(`${dayInfo.painMediumCount}× Bauchweh 2`);
-  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1/7`);
-  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5/6`);
+  if (dayInfo.bristolVeryHighCount > 0) details.push(`${dayInfo.bristolVeryHighCount}× Poopie ≥6`);
+  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1`);
+  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5`);
   if (details.length === 0) details.push("Unauffällig");
   return details.join(" | ");
 }
@@ -258,15 +363,33 @@ function classifyDaySeverity(dayInfo) {
     return "neutral";
   }
 
-  if (dayInfo.painHighCount >= 2 || dayInfo.bristolHighCount >= 1 || dayInfo.score >= 4 || dayInfo.bristolMediumCount >= 3) {
+  if (dayInfo.painVeryHighCount >= 2 || dayInfo.bristolVeryHighCount >= 4 || dayInfo.score >= 9) {
+    return "very-severe";
+  }
+
+  if (
+    dayInfo.painVeryHighCount >= 1 ||
+    dayInfo.painHighCount >= 2 ||
+    dayInfo.bristolVeryHighCount >= 2 ||
+    (dayInfo.bristolVeryHighCount >= 1 && (dayInfo.painHighCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
+    dayInfo.bristolMediumCount >= 3 ||
+    dayInfo.score >= 6
+  ) {
     return "severe";
   }
 
-  if (dayInfo.painHighCount >= 1 || dayInfo.bristolMediumCount >= 1 || dayInfo.score >= 2) {
+  if (
+    dayInfo.painHighCount >= 1 ||
+    dayInfo.bristolVeryHighCount >= 1 ||
+    (dayInfo.bristolHighCount >= 1 && (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painHighCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
+    dayInfo.painMediumCount >= 2 ||
+    dayInfo.bristolMediumCount >= 1 ||
+    dayInfo.score >= 3
+  ) {
     return "medium";
   }
 
-  if (dayInfo.score > 0) {
+  if (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.bristolHighCount >= 1 || dayInfo.score > 0) {
     return "mild";
   }
 
@@ -283,8 +406,11 @@ function buildHistoryDayMap(records) {
     if (!dayMap.has(key)) {
       dayMap.set(key, {
         totalEntries: 0,
+        painLowCount: 0,
+        painVeryHighCount: 0,
         painHighCount: 0,
         painMediumCount: 0,
+        bristolVeryHighCount: 0,
         bristolHighCount: 0,
         bristolMediumCount: 0,
         score: 0
@@ -298,12 +424,18 @@ function buildHistoryDayMap(records) {
       const pain = parseNumberValue(record.pain, 0);
       const bloating = parseNumberValue(record.bloating, 0);
 
-      if (pain >= 3) {
+      if (pain >= 4) {
+        dayInfo.painVeryHighCount += 1;
+        dayInfo.score += 4;
+      } else if (pain >= 3) {
         dayInfo.painHighCount += 1;
-        dayInfo.score += pain >= 4 ? 3 : 2;
+        dayInfo.score += 2;
       } else if (pain === 2) {
         dayInfo.painMediumCount += 1;
         dayInfo.score += 1;
+      } else if (pain === 1) {
+        dayInfo.painLowCount += 1;
+        dayInfo.score += 0.5;
       }
 
       if (bloating >= 3) {
@@ -315,11 +447,16 @@ function buildHistoryDayMap(records) {
 
     if (record.type === "bm") {
       const bristol = parseNumberValue(record.bristolScale, 0);
-      if(bristol === 1 || bristol ===7){
+      if (bristol >= 6) {
+        dayInfo.bristolVeryHighCount += 1;
+        dayInfo.score += 3;
+      }
+
+      if (bristol === 1) {
         dayInfo.bristolHighCount += 1;
         dayInfo.score += 3;
       }
-      else if (bristol > 4||bristol < 3)  {
+      else if (bristol === 2 || bristol === 5)  {
        dayInfo.bristolMediumCount += 1;
         dayInfo.score += 2;
       } 
@@ -338,7 +475,7 @@ function createCalendarDayCell(label, className) {
 }
 
 function getHistoryRecordsForSelectedDay() {
-  const records = getSortedRecords();
+  const records = getHistorySortedRecords();
   if (!historyCalendarVisible) {
     return records;
   }
@@ -347,7 +484,18 @@ function getHistoryRecordsForSelectedDay() {
     return [];
   }
 
-  return records.filter(record => getLocalDateKey(record.timestamp) === historySelectedDateKey);
+  return records
+    .filter(record => getLocalDateKey(record.timestamp) === historySelectedDateKey)
+    .sort(compareRecordTimestampsAscending);
+}
+
+function resetHistoryVisibleCount() {
+  historyVisibleCount = HISTORY_PAGE_SIZE;
+}
+
+function loadMoreHistoryEntries() {
+  historyVisibleCount += HISTORY_PAGE_SIZE;
+  renderHistoryLog();
 }
 
 function getHistoryEmptyMessage() {
@@ -396,7 +544,7 @@ function renderHistoryCalendar() {
   for (let day = 1; day <= daysInMonth; day++) {
     const cell = document.createElement("div");
     const dateKey = `${monthDate.getFullYear()}-${padNumber(monthDate.getMonth() + 1)}-${padNumber(day)}`;
-    const dayInfo = dayMap.get(dateKey) || { totalEntries: 0, painHighCount: 0, painMediumCount: 0, bristolHighCount: 0, bristolMediumCount: 0, score: 0 };
+    const dayInfo = dayMap.get(dateKey) || { totalEntries: 0, painLowCount: 0, painVeryHighCount: 0, painHighCount: 0, painMediumCount: 0, bristolVeryHighCount: 0, bristolHighCount: 0, bristolMediumCount: 0, score: 0 };
     const severity = classifyDaySeverity(dayInfo);
 
     cell.className = `calendar-cell calendar-day severity-${severity}`;
@@ -419,6 +567,7 @@ function renderHistoryCalendar() {
     cell.title = buildDaySeveritySummary(dayInfo);
     cell.onclick = () => {
       historySelectedDateKey = historySelectedDateKey === dateKey ? null : dateKey;
+      resetHistoryVisibleCount();
       renderHistoryCalendar();
       renderHistoryLog();
     };
@@ -431,6 +580,7 @@ function toggleHistoryCalendar() {
   if (!historyCalendarVisible) {
     historySelectedDateKey = null;
   }
+  resetHistoryVisibleCount();
   renderHistoryCalendar();
   renderHistoryLog();
 }
@@ -452,6 +602,9 @@ function setActiveView(viewName) {
 
   const activeConfig = NAV_CONFIG[viewName];
   if (activeConfig && typeof activeConfig.onShow === "function") {
+    if (viewName === "history") {
+      resetHistoryVisibleCount();
+    }
     activeConfig.onShow();
   }
 
@@ -483,18 +636,51 @@ function getFoodSuggestions(value, foods) {
   return uniqueNames.filter(name => name.toLowerCase().includes(value));
 }
 
+function hideFoodSuggestions() {
+  const suggestionsDiv = byId("foodSuggestions");
+  if (!suggestionsDiv) return;
+
+  suggestionsDiv.style.display = "none";
+  suggestionsDiv.innerHTML = "";
+}
+
+function applyFoodSuggestionSelection(name, foods) {
+  const input = byId("foodText");
+  const tagsInput = byId("tags");
+  if (!input) return;
+
+  input.value = name;
+  lastSelectedFoodSuggestion = name.trim().toLowerCase();
+
+  const selectedFood = foods.find(food => food.name.toLowerCase() === name.toLowerCase());
+  if (selectedFood && selectedFood.tags && tagsInput) {
+    tagsInput.value = selectedFood.tags.filter(Boolean).join(", ");
+  }
+
+  hideFoodSuggestions();
+  input.blur();
+}
+
 function showFoodSuggestions() {
   const input = byId("foodText");
   const suggestionsDiv = byId("foodSuggestions");
   if (!input || !suggestionsDiv) return;
 
   const value = input.value.trim().toLowerCase();
+  if (value !== lastSelectedFoodSuggestion) {
+    lastSelectedFoodSuggestion = "";
+  }
+
+  if (value && value === lastSelectedFoodSuggestion) {
+    hideFoodSuggestions();
+    return;
+  }
+
   const foods = getFoods().filter(food => food.name && food.name.trim() !== "");
   const suggestions = getFoodSuggestions(value, foods);
 
   if (suggestions.length === 0) {
-    suggestionsDiv.style.display = "none";
-    suggestionsDiv.innerHTML = "";
+    hideFoodSuggestions();
     return;
   }
 
@@ -503,14 +689,9 @@ function showFoodSuggestions() {
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.textContent = name;
-    item.onclick = function() {
-      input.value = name;
-      const selectedFood = foods.find(food => food.name.toLowerCase() === name.toLowerCase());
-      const tagsInput = byId("tags");
-      if (selectedFood && selectedFood.tags && tagsInput) {
-        tagsInput.value = selectedFood.tags.filter(Boolean).join(", ");
-      }
-      suggestionsDiv.style.display = "none";
+    item.onpointerdown = function(event) {
+      event.preventDefault();
+      applyFoodSuggestionSelection(name, foods);
     };
     suggestionsDiv.appendChild(item);
   });
@@ -524,7 +705,7 @@ function hideFoodSuggestionsOnOutsideClick(event) {
   if (!suggestionsDiv || !input) return;
 
   if (event.target !== input && !suggestionsDiv.contains(event.target)) {
-    suggestionsDiv.style.display = "none";
+    hideFoodSuggestions();
   }
 }
 
@@ -564,6 +745,8 @@ function createFoodCard(food) {
 function renderSavedFoods() {
   const savedFoodsList = byId("savedFoodsList");
   if (!savedFoodsList) return;
+
+  updateFoodSortButton();
 
   savedFoodsList.innerHTML = "";
   const foods = getSortedFoods();
@@ -615,7 +798,7 @@ function editFoodItem(foodId, event) {
     foods[foodIndex].name = updatedName;
     foods[foodIndex].tags = parseTagList(tagsInput.value);
     saveFoods(foods);
-    card.replaceWith(createFoodCard(foods[foodIndex]));
+    renderSavedFoods();
   }));
 
   card.appendChild(createButton("Abbrechen", () => {
@@ -638,7 +821,10 @@ function deleteFoodItem(foodId) {
 function renderHistoryLog() {
   renderUnifiedLog("historyLog", {
     records: getHistoryRecordsForSelectedDay(),
-    emptyMessage: getHistoryEmptyMessage()
+    emptyMessage: getHistoryEmptyMessage(),
+    maxItems: historyVisibleCount,
+    onLoadMore: loadMoreHistoryEntries,
+    loadMoreLabel: "mehr laden"
   });
   renderHistoryCalendar();
 }
@@ -753,6 +939,7 @@ function normalizeImportedRecord(record) {
     return {
       type,
       timestamp,
+      createdAt: timestamp,
       pain: clampNumberValue(record.pain, 0, 5, 0),
       bloating: clampNumberValue(record.bloating, 0, 5, 0)
     };
@@ -762,6 +949,7 @@ function normalizeImportedRecord(record) {
     return {
       type,
       timestamp,
+      createdAt: timestamp,
       tags: normalizeTagListValue(record.tags),
       bristolScale: clampNumberValue(record["bristol-scale"] ?? record.bristolScale, 1, 7, 1),
       evacuation: normalizeEvacuationValue(record.evacuation),
@@ -775,6 +963,7 @@ function normalizeImportedRecord(record) {
     return {
       type,
       timestamp,
+      createdAt: timestamp,
       foodName,
       foodTags: Array.isArray(record.tags)
         ? normalizeTagListValue(record.tags)
@@ -789,7 +978,9 @@ function normalizeImportedRecord(record) {
 }
 
 function getRecordSignature(record) {
-  return JSON.stringify(formatRecordForExport(record));
+  const signatureRecord = formatRecordForExport(record);
+  delete signatureRecord.createdAt;
+  return JSON.stringify(signatureRecord);
 }
 
 function extractImportedRecords(payload) {
@@ -998,7 +1189,11 @@ function renderUnifiedLog(targetElementId, options = {}) {
 
   container.innerHTML = "";
   const data = Array.isArray(options.records) ? options.records : getSortedRecords();
-  const maxItems = targetElementId === "log" ? 5 : data.length;
+  const maxItems = Number.isInteger(options.maxItems)
+    ? options.maxItems
+    : targetElementId === "log"
+      ? 5
+      : data.length;
   const visibleEntries = data.slice(0, maxItems);
 
   if (targetElementId === "historyLog" && visibleEntries.length === 0) {
@@ -1019,6 +1214,15 @@ function renderUnifiedLog(targetElementId, options = {}) {
     moreCard.appendChild(createButton("Mehr sehen (History)", () => {
       const navHistory = byId("navHistory");
       if (navHistory) navHistory.click();
+    }));
+    container.appendChild(moreCard);
+  }
+
+  if (typeof options.onLoadMore === "function" && data.length > maxItems) {
+    const moreCard = document.createElement("div");
+    moreCard.className = "card";
+    moreCard.appendChild(createButton(options.loadMoreLabel || "Mehr laden", options.onLoadMore, {
+      className: "secondary-button"
     }));
     container.appendChild(moreCard);
   }
@@ -1206,9 +1410,11 @@ function resetFoodForm() {
   resetScaleGroup("speedScale", "speed", 0);
   resetScaleGroup("sizeScale", "size", 0);
   resetScaleGroup("riskScale", "risk", 0);
+  lastSelectedFoodSuggestion = "";
   byId("foodText").value = "";
   byId("tags").value = "";
   byId("foodDate").value = "";
+  hideFoodSuggestions();
 }
 
 function initScales() {
@@ -1266,6 +1472,7 @@ function savePainBloating() {
   const record = {
     type: "symptoms",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     pain: parseInt(byId("pain").value, 10),
     bloating: parseInt(byId("bloating").value, 10)
   };
@@ -1282,6 +1489,7 @@ function saveBM() {
   const record = {
     type: "bm",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     bristolScale: parseInt(byId("bristol").value, 10),
     evacuation: byId("evacuation").value,
     pressure: parseInt(byId("pressure").value, 10),
@@ -1385,6 +1593,7 @@ function saveFood() {
   const record = {
     type: "food_log",
     timestamp: date,
+    createdAt: new Date().toISOString(),
     foodName: name,
     foodTags: tags,
     speed,
@@ -1405,6 +1614,7 @@ function initApp() {
   appInitialized = true;
 
   initNavigation();
+  updateFoodSortButton();
   const importInput = byId("importRecordsInput");
   if (importInput) {
     importInput.addEventListener("change", handleImportRecordsSelection);

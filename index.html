@@ -104,6 +104,7 @@
       <span class="calendar-legend-item"><span class="calendar-legend-color mild"></span>Mild</span>
       <span class="calendar-legend-item"><span class="calendar-legend-color medium"></span>Mittel</span>
       <span class="calendar-legend-item"><span class="calendar-legend-color severe"></span>Stark</span>
+      <span class="calendar-legend-item"><span class="calendar-legend-color very-severe"></span>Sehr stark</span>
     </div>
     <div id="historyCalendarGrid" class="calendar-grid"></div>
   </div>
@@ -111,8 +112,11 @@
 </section>
 
 <section id="FoodSection" style="display:none;">
-  <div class="section-header">
+  <div class="section-header history-header">
     <h2>Gespeichertes Essen</h2>
+  </div>
+  <div class="history-actions food-actions">
+    <button id="foodSortToggle" class="secondary-button" onclick="toggleFoodSortMode()">Sortierung: Name</button>
     <button class="secondary-button" onclick="addFoodFromList()">+ Hinzufügen</button>
   </div>
   <div id="savedFoodsList"></div>
