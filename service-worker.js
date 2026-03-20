@@ -1,10 +1,15 @@
-const CACHE_NAME = "ibs-cache-v3";
+const CACHE_NAME = "ibs-cache-v3.5";
 
 const FILES_TO_CACHE = [
   "/",
   "/index.html",
   "/style.css",
+  "/core-utils.js",
+  "/record-utils.js",
+  "/food-utils.js",
+  "/history-utils.js",
   "/app.js",
+  "/monthly-wrapped.js",
   "/manifest.json",
   "/icon.png",
   "/1.png",
@@ -17,6 +22,7 @@ const FILES_TO_CACHE = [
 ];
 
 self.addEventListener("install", event => {
+  self.skipWaiting();
 
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -39,7 +45,7 @@ self.addEventListener("activate", event => {
           }
 
         })
-      );
+      ).then(() => self.clients.claim());
 
     })
   );

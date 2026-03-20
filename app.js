@@ -21,202 +21,9 @@ let historyCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth
 let historySelectedDateKey = null;
 let historyVisibleCount = 10;
 let lastSelectedFoodSuggestion = "";
+let lastSelectedTagSuggestion = "";
 
 const HISTORY_PAGE_SIZE = 10;
-
-function byId(id) {
-  return document.getElementById(id);
-}
-
-function readStoredArray(key) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeStoredArray(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function readStoredValue(key, fallback = "") {
-  const value = localStorage.getItem(key);
-  return value === null ? fallback : value;
-}
-
-function writeStoredValue(key, value) {
-  localStorage.setItem(key, value);
-}
-
-function parseTagList(value) {
-  return value
-    .split(",")
-    .map(tag => tag.trim())
-    .filter(Boolean);
-}
-
-function createButton(text, onClick, options = {}) {
-  const button = document.createElement("button");
-  button.type = options.type || "button";
-  button.textContent = text;
-  if (options.className) button.className = options.className;
-  if (options.title) button.title = options.title;
-  if (options.ariaLabel) button.setAttribute("aria-label", options.ariaLabel);
-  button.onclick = onClick;
-  return button;
-}
-
-function appendField(container, labelText, control) {
-  container.appendChild(document.createTextNode(`${labelText}: `));
-  container.appendChild(control);
-  container.appendChild(document.createElement("br"));
-}
-
-function createNumberSelect(min, max, selectedValue) {
-  const select = document.createElement("select");
-  for (let value = min; value <= max; value++) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
-    if (value === selectedValue) option.selected = true;
-    select.appendChild(option);
-  }
-  return select;
-}
-
-function createChoiceSelect(options, selectedValue, labelMap = {}) {
-  const select = document.createElement("select");
-  options.forEach(value => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = labelMap[value] || value;
-    if (value === selectedValue) option.selected = true;
-    select.appendChild(option);
-  });
-  return select;
-}
-
-function formatLocalDateTimeValue(timestamp) {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "";
-
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}`;
-}
-
-function createDateTimeInput(timestamp) {
-  const input = document.createElement("input");
-  input.type = "datetime-local";
-  input.value = formatLocalDateTimeValue(timestamp);
-  return input;
-}
-
-function updateEntryTimestamp(entry, dateInput) {
-  if (!dateInput.value) return;
-
-  const updatedTimestamp = new Date(dateInput.value).toISOString();
-  if (updatedTimestamp !== entry.timestamp) {
-    entry.timestamp = updatedTimestamp;
-  }
-}
-
-function createCardActions(actionsConfig) {
-  const actions = document.createElement("div");
-  actions.className = "card-actions";
-
-  actionsConfig.forEach(config => {
-    actions.appendChild(createButton(config.text, config.onClick, config.options));
-  });
-
-  return actions;
-}
-
-function buildTagContainer(tags, showAllTags) {
-  const cleanTags = Array.isArray(tags) ? tags.filter(Boolean) : [];
-  if (cleanTags.length === 0) return null;
-
-  const tagsDiv = document.createElement("div");
-  const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
-
-  visibleTags.forEach(tag => {
-    const span = document.createElement("span");
-    span.className = "tag";
-    span.textContent = tag;
-    tagsDiv.appendChild(span);
-  });
-
-  if (!showAllTags && cleanTags.length > 5) {
-    const span = document.createElement("span");
-    span.className = "tag";
-    span.textContent = "...";
-    tagsDiv.appendChild(span);
-  }
-
-  return tagsDiv;
-}
-
-function compareFoodNames(foodA, foodB) {
-  const nameA = (foodA?.name || "").trim();
-  const nameB = (foodB?.name || "").trim();
-  const nameComparison = nameA.localeCompare(nameB, "de", { sensitivity: "base" });
-
-  if (nameComparison !== 0) {
-    return nameComparison;
-  }
-
-  return new Date(foodA?.createdAt || 0) - new Date(foodB?.createdAt || 0);
-}
-
-function compareFoodNewestFirst(foodA, foodB) {
-  return new Date(foodB?.createdAt || 0) - new Date(foodA?.createdAt || 0);
-}
-
-function getFoodSortMode() {
-  const sortMode = readStoredValue(STORAGE_KEYS.foodSortMode, FOOD_SORT_MODES.name);
-  return Object.values(FOOD_SORT_MODES).includes(sortMode) ? sortMode : FOOD_SORT_MODES.name;
-}
-
-function setFoodSortMode(sortMode) {
-  const nextSortMode = Object.values(FOOD_SORT_MODES).includes(sortMode) ? sortMode : FOOD_SORT_MODES.name;
-  writeStoredValue(STORAGE_KEYS.foodSortMode, nextSortMode);
-}
-
-function getNextFoodSortMode(sortMode) {
-  return sortMode === FOOD_SORT_MODES.name ? FOOD_SORT_MODES.newest : FOOD_SORT_MODES.name;
-}
-
-function getFoodSortButtonLabel(sortMode) {
-  return sortMode === FOOD_SORT_MODES.newest ? "Sortierung: Neueste" : "Sortierung: Name";
-}
-
-function updateFoodSortButton() {
-  const sortButton = byId("foodSortToggle");
-  if (!sortButton) return;
-
-  const sortMode = getFoodSortMode();
-  sortButton.textContent = getFoodSortButtonLabel(sortMode);
-  sortButton.setAttribute("aria-label", getFoodSortButtonLabel(sortMode));
-  sortButton.title = `Aktuell ${getFoodSortButtonLabel(sortMode)}`;
-}
-
-function toggleFoodSortMode() {
-  const nextSortMode = getNextFoodSortMode(getFoodSortMode());
-  setFoodSortMode(nextSortMode);
-  renderSavedFoods();
-}
-
-function getSortedFoods() {
-  const sortMode = getFoodSortMode();
-  const foods = getFoods();
-
-  if (sortMode === FOOD_SORT_MODES.newest) {
-    return foods.sort(compareFoodNewestFirst);
-  }
-
-  return foods.sort(compareFoodNames);
-}
 
 function getSortedRecords() {
   return getRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -305,291 +112,6 @@ function refreshEditedEntry(records, previousTimestamp, updatedEntry) {
   }
 }
 
-function findFoodCard(foodId) {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return null;
-
-  return Array.from(savedFoodsList.querySelectorAll(".card")).find(card => card.dataset.foodId === String(foodId)) || null;
-}
-
-function getLocalDateParts(timestamp) {
-  const date = new Date(timestamp);
-  return {
-    year: date.getFullYear(),
-    month: date.getMonth(),
-    day: date.getDate()
-  };
-}
-
-function getLocalDateKey(timestamp) {
-  const parts = getLocalDateParts(timestamp);
-  return `${parts.year}-${padNumber(parts.month + 1)}-${padNumber(parts.day)}`;
-}
-
-function getMonthStart(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function formatHistoryMonthLabel(date) {
-  return date.toLocaleDateString("de-DE", {
-    month: "long",
-    year: "numeric"
-  });
-}
-
-function getHistoryCalendarDayName(index) {
-  return ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index];
-}
-
-function buildDaySeveritySummary(dayInfo) {
-  if (!dayInfo || dayInfo.totalEntries === 0) {
-    return "Keine Einträge";
-  }
-
-  const details = [];
-  if (dayInfo.painLowCount > 0) details.push(`${dayInfo.painLowCount}× Bauchweh 1`);
-  if (dayInfo.painVeryHighCount > 0) details.push(`${dayInfo.painVeryHighCount}× Bauchweh ≥4`);
-  if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh 3`);
-  if (dayInfo.painMediumCount > 0) details.push(`${dayInfo.painMediumCount}× Bauchweh 2`);
-  if (dayInfo.bristolVeryHighCount > 0) details.push(`${dayInfo.bristolVeryHighCount}× Poopie ≥6`);
-  if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1`);
-  if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5`);
-  if (details.length === 0) details.push("Unauffällig");
-  return details.join(" | ");
-}
-
-function classifyDaySeverity(dayInfo) {
-  if (!dayInfo || dayInfo.totalEntries === 0) {
-    return "neutral";
-  }
-
-  if (dayInfo.painVeryHighCount >= 2 || dayInfo.bristolVeryHighCount >= 4 || dayInfo.score >= 9) {
-    return "very-severe";
-  }
-
-  if (
-    dayInfo.painVeryHighCount >= 1 ||
-    dayInfo.painHighCount >= 2 ||
-    dayInfo.bristolVeryHighCount >= 2 ||
-    (dayInfo.bristolVeryHighCount >= 1 && (dayInfo.painHighCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
-    dayInfo.bristolMediumCount >= 3 ||
-    dayInfo.score >= 6
-  ) {
-    return "severe";
-  }
-
-  if (
-    dayInfo.painHighCount >= 1 ||
-    dayInfo.bristolVeryHighCount >= 1 ||
-    (dayInfo.bristolHighCount >= 1 && (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painHighCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
-    dayInfo.painMediumCount >= 2 ||
-    dayInfo.bristolMediumCount >= 1 ||
-    dayInfo.score >= 3
-  ) {
-    return "medium";
-  }
-
-  if (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.bristolHighCount >= 1 || dayInfo.score > 0) {
-    return "mild";
-  }
-
-  return "neutral";
-}
-
-function buildHistoryDayMap(records) {
-  const dayMap = new Map();
-
-  records.forEach(record => {
-    if (!record || !record.timestamp) return;
-
-    const key = getLocalDateKey(record.timestamp);
-    if (!dayMap.has(key)) {
-      dayMap.set(key, {
-        totalEntries: 0,
-        painLowCount: 0,
-        painVeryHighCount: 0,
-        painHighCount: 0,
-        painMediumCount: 0,
-        bristolVeryHighCount: 0,
-        bristolHighCount: 0,
-        bristolMediumCount: 0,
-        score: 0
-      });
-    }
-
-    const dayInfo = dayMap.get(key);
-    dayInfo.totalEntries += 1;
-
-    if (record.type === "symptoms") {
-      const pain = parseNumberValue(record.pain, 0);
-      const bloating = parseNumberValue(record.bloating, 0);
-
-      if (pain >= 4) {
-        dayInfo.painVeryHighCount += 1;
-        dayInfo.score += 4;
-      } else if (pain >= 3) {
-        dayInfo.painHighCount += 1;
-        dayInfo.score += 2;
-      } else if (pain === 2) {
-        dayInfo.painMediumCount += 1;
-        dayInfo.score += 1;
-      } else if (pain === 1) {
-        dayInfo.painLowCount += 1;
-        dayInfo.score += 0.5;
-      }
-
-      if (bloating >= 3) {
-        dayInfo.score += 1;
-      } else if (bloating === 2) {
-        dayInfo.score += 0.5;
-      }
-    }
-
-    if (record.type === "bm") {
-      const bristol = parseNumberValue(record.bristolScale, 0);
-      if (bristol >= 6) {
-        dayInfo.bristolVeryHighCount += 1;
-        dayInfo.score += 3;
-      }
-
-      if (bristol === 1) {
-        dayInfo.bristolHighCount += 1;
-        dayInfo.score += 3;
-      }
-      else if (bristol === 2 || bristol === 5)  {
-       dayInfo.bristolMediumCount += 1;
-        dayInfo.score += 2;
-      } 
-      
-    }
-  });
-
-  return dayMap;
-}
-
-function createCalendarDayCell(label, className) {
-  const cell = document.createElement("div");
-  cell.className = className;
-  cell.textContent = label;
-  return cell;
-}
-
-function getHistoryRecordsForSelectedDay() {
-  const records = getHistorySortedRecords();
-  if (!historyCalendarVisible) {
-    return records;
-  }
-
-  if (!historySelectedDateKey) {
-    return [];
-  }
-
-  return records
-    .filter(record => getLocalDateKey(record.timestamp) === historySelectedDateKey)
-    .sort(compareRecordTimestampsAscending);
-}
-
-function resetHistoryVisibleCount() {
-  historyVisibleCount = HISTORY_PAGE_SIZE;
-}
-
-function loadMoreHistoryEntries() {
-  historyVisibleCount += HISTORY_PAGE_SIZE;
-  renderHistoryLog();
-}
-
-function getHistoryEmptyMessage() {
-  if (historyCalendarVisible && !historySelectedDateKey) {
-    return "Wähle einen Tag im Kalender aus.";
-  }
-
-  if (historyCalendarVisible && historySelectedDateKey) {
-    return "Keine Einträge für diesen Tag.";
-  }
-
-  return "Noch keine Einträge vorhanden.";
-}
-
-function renderHistoryCalendar() {
-  const container = byId("historyCalendarContainer");
-  const grid = byId("historyCalendarGrid");
-  const monthLabel = byId("historyCalendarMonthLabel");
-  const toggleButton = byId("historyCalendarToggle");
-  if (!container || !grid || !monthLabel || !toggleButton) return;
-
-  container.style.display = historyCalendarVisible ? "block" : "none";
-  toggleButton.classList.toggle("active", historyCalendarVisible);
-  if (!historyCalendarVisible) return;
-
-  const monthDate = getMonthStart(historyCalendarDate);
-  historyCalendarDate = monthDate;
-  monthLabel.textContent = formatHistoryMonthLabel(monthDate);
-  grid.innerHTML = "";
-
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const dayNameCell = createCalendarDayCell(getHistoryCalendarDayName(dayIndex), "calendar-cell calendar-weekday");
-    grid.appendChild(dayNameCell);
-  }
-
-  const records = getRecords();
-  const dayMap = buildHistoryDayMap(records);
-  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
-
-  for (let index = 0; index < leadingEmptyDays; index++) {
-    grid.appendChild(createCalendarDayCell("", "calendar-cell calendar-day is-empty"));
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const cell = document.createElement("div");
-    const dateKey = `${monthDate.getFullYear()}-${padNumber(monthDate.getMonth() + 1)}-${padNumber(day)}`;
-    const dayInfo = dayMap.get(dateKey) || { totalEntries: 0, painLowCount: 0, painVeryHighCount: 0, painHighCount: 0, painMediumCount: 0, bristolVeryHighCount: 0, bristolHighCount: 0, bristolMediumCount: 0, score: 0 };
-    const severity = classifyDaySeverity(dayInfo);
-
-    cell.className = `calendar-cell calendar-day severity-${severity}`;
-    if (historySelectedDateKey === dateKey) {
-      cell.classList.add("is-selected");
-    }
-
-    const dayNumber = document.createElement("div");
-    dayNumber.className = "calendar-day-number";
-    dayNumber.textContent = day;
-    cell.appendChild(dayNumber);
-
-    if (dayInfo.totalEntries > 0) {
-      const meta = document.createElement("div");
-      meta.className = "calendar-day-meta";
-      meta.textContent = `${dayInfo.totalEntries}×`;
-      cell.appendChild(meta);
-    }
-
-    cell.title = buildDaySeveritySummary(dayInfo);
-    cell.onclick = () => {
-      historySelectedDateKey = historySelectedDateKey === dateKey ? null : dateKey;
-      resetHistoryVisibleCount();
-      renderHistoryCalendar();
-      renderHistoryLog();
-    };
-    grid.appendChild(cell);
-  }
-}
-
-function toggleHistoryCalendar() {
-  historyCalendarVisible = !historyCalendarVisible;
-  if (!historyCalendarVisible) {
-    historySelectedDateKey = null;
-  }
-  resetHistoryVisibleCount();
-  renderHistoryCalendar();
-  renderHistoryLog();
-}
-
-function changeHistoryCalendarMonth(offset) {
-  historyCalendarDate = new Date(historyCalendarDate.getFullYear(), historyCalendarDate.getMonth() + offset, 1);
-  renderHistoryCalendar();
-}
-
 function setActiveView(viewName) {
   Object.entries(NAV_CONFIG).forEach(([name, config]) => {
     const button = byId(config.buttonId);
@@ -619,218 +141,10 @@ function initNavigation() {
   });
 }
 
-function getFoodSuggestions(value, foods) {
-  const uniqueNames = Array.from(new Set(foods.map(food => food.name)));
-
-  if (!value) {
-    const recentNames = [];
-    for (let index = foods.length - 1; index >= 0 && recentNames.length < 4; index--) {
-      const name = foods[index].name;
-      if (name && !recentNames.includes(name)) {
-        recentNames.push(name);
-      }
-    }
-    return recentNames;
-  }
-
-  return uniqueNames.filter(name => name.toLowerCase().includes(value));
-}
-
-function hideFoodSuggestions() {
-  const suggestionsDiv = byId("foodSuggestions");
-  if (!suggestionsDiv) return;
-
-  suggestionsDiv.style.display = "none";
-  suggestionsDiv.innerHTML = "";
-}
-
-function applyFoodSuggestionSelection(name, foods) {
-  const input = byId("foodText");
-  const tagsInput = byId("tags");
-  if (!input) return;
-
-  input.value = name;
-  lastSelectedFoodSuggestion = name.trim().toLowerCase();
-
-  const selectedFood = foods.find(food => food.name.toLowerCase() === name.toLowerCase());
-  if (selectedFood && selectedFood.tags && tagsInput) {
-    tagsInput.value = selectedFood.tags.filter(Boolean).join(", ");
-  }
-
-  hideFoodSuggestions();
-  input.blur();
-}
-
-function showFoodSuggestions() {
-  const input = byId("foodText");
-  const suggestionsDiv = byId("foodSuggestions");
-  if (!input || !suggestionsDiv) return;
-
-  const value = input.value.trim().toLowerCase();
-  if (value !== lastSelectedFoodSuggestion) {
-    lastSelectedFoodSuggestion = "";
-  }
-
-  if (value && value === lastSelectedFoodSuggestion) {
-    hideFoodSuggestions();
-    return;
-  }
-
-  const foods = getFoods().filter(food => food.name && food.name.trim() !== "");
-  const suggestions = getFoodSuggestions(value, foods);
-
-  if (suggestions.length === 0) {
-    hideFoodSuggestions();
-    return;
-  }
-
-  suggestionsDiv.innerHTML = "";
-  suggestions.forEach(name => {
-    const item = document.createElement("div");
-    item.className = "suggestion-item";
-    item.textContent = name;
-    item.onpointerdown = function(event) {
-      event.preventDefault();
-      applyFoodSuggestionSelection(name, foods);
-    };
-    suggestionsDiv.appendChild(item);
-  });
-
-  suggestionsDiv.style.display = "block";
-}
-
-function hideFoodSuggestionsOnOutsideClick(event) {
-  const suggestionsDiv = byId("foodSuggestions");
-  const input = byId("foodText");
-  if (!suggestionsDiv || !input) return;
-
-  if (event.target !== input && !suggestionsDiv.contains(event.target)) {
-    hideFoodSuggestions();
-  }
-}
-
-function createFoodCard(food) {
-  const card = document.createElement("div");
-  card.className = "card";
-  card.dataset.foodId = String(food.id);
-
-  const title = document.createElement("h3");
-  title.textContent = food.name || "Essen";
-  card.appendChild(title);
-
-  const detailsDiv = document.createElement("div");
-  detailsDiv.className = "labels";
-  const details = [];
-  if (Array.isArray(food.tags) && food.tags.length > 0) {
-    details.push(`Zutaten: ${food.tags.filter(Boolean).join(", ")}`);
-  }
-  detailsDiv.textContent = details.join(" | ");
-  card.appendChild(detailsDiv);
-
-  card.appendChild(createCardActions([
-    {
-      text: "✏",
-      onClick: event => editFoodItem(food.id, event),
-      options: { title: "Bearbeiten", ariaLabel: "Bearbeiten" }
-    },
-    {
-      text: "X",
-      onClick: () => deleteFoodItem(food.id)
-    }
-  ]));
-
-  return card;
-}
-
-function renderSavedFoods() {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return;
-
-  updateFoodSortButton();
-
-  savedFoodsList.innerHTML = "";
-  const foods = getSortedFoods();
-
-  if (foods.length === 0) {
-    savedFoodsList.textContent = "Noch keine Essen gespeichert.";
-    return;
-  }
-
-  foods.forEach(food => {
-    savedFoodsList.appendChild(createFoodCard(food));
-  });
-}
-
-function editFoodItem(foodId, event) {
-  const foods = getFoods();
-  const foodIndex = foods.findIndex(food => food.id === foodId);
-  if (foodIndex === -1) return;
-
-  const food = foods[foodIndex];
-  const currentCard = event && event.target ? event.target.closest(".card") : findFoodCard(foodId);
-  if (!currentCard) return;
-
-  const card = document.createElement("div");
-  card.className = "card";
-  card.dataset.foodId = String(food.id);
-
-  const title = document.createElement("h3");
-  title.textContent = "Food bearbeiten";
-  card.appendChild(title);
-
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
-  nameInput.value = food.name || "";
-  appendField(card, "Name", nameInput);
-
-  const tagsInput = document.createElement("input");
-  tagsInput.type = "text";
-  tagsInput.value = Array.isArray(food.tags) ? food.tags.join(", ") : "";
-  appendField(card, "Zutaten", tagsInput);
-
-  card.appendChild(createButton("Speichern", () => {
-    const updatedName = nameInput.value.trim();
-    if (!updatedName) {
-      alert("Essen braucht einen Namen.");
-      return;
-    }
-
-    foods[foodIndex].name = updatedName;
-    foods[foodIndex].tags = parseTagList(tagsInput.value);
-    saveFoods(foods);
-    renderSavedFoods();
-  }));
-
-  card.appendChild(createButton("Abbrechen", () => {
-    card.replaceWith(createFoodCard(food));
-  }, {
-    className: "secondary-button"
-  }));
-
-  currentCard.replaceWith(card);
-}
-
-function deleteFoodItem(foodId) {
-  if (!confirm("Möchtest du dieses Food wirklich löschen?")) return;
-
-  const remainingFoods = getFoods().filter(food => food.id !== foodId);
-  saveFoods(remainingFoods);
-  renderSavedFoods();
-}
-
-function renderHistoryLog() {
-  renderUnifiedLog("historyLog", {
-    records: getHistoryRecordsForSelectedDay(),
-    emptyMessage: getHistoryEmptyMessage(),
-    maxItems: historyVisibleCount,
-    onLoadMore: loadMoreHistoryEntries,
-    loadMoreLabel: "mehr laden"
-  });
-  renderHistoryCalendar();
-}
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
+if ("serviceWorker" in navigator && supportsPwaFeatures()) {
+  navigator.serviceWorker
+    .register("service-worker.js", { updateViaCache: "none" })
+    .catch(() => {});
 }
 
 function getRecords() {
@@ -847,146 +161,6 @@ function getFoods() {
 
 function saveFoods(foods) {
   writeStoredArray(STORAGE_KEYS.foods, foods);
-}
-
-function generateId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function padNumber(value) {
-  return String(value).padStart(2, "0");
-}
-
-function formatRecordForExport(record) {
-  const exportedRecord = {
-    type: record.type,
-    timestamp: record.timestamp
-  };
-
-  if (record.type === "food_log") {
-    const foodName = record.foodName || record.text || "";
-    const foodTags = Array.isArray(record.foodTags) ? record.foodTags.filter(Boolean) : [];
-    if (record.speed && record.speed !== 0) exportedRecord.speed = record.speed;
-    if (foodTags.length > 0) exportedRecord.tags = foodTags;
-    exportedRecord.text = foodName || "";
-    if (record.size && record.size !== 0) exportedRecord.size = record.size;
-    if (record.risk !== undefined && record.risk !== 0) exportedRecord.risk = record.risk;
-  } else if (record.type === "bm") {
-    exportedRecord.tags = Array.isArray(record.tags) ? record.tags.filter(Boolean) : [];
-    exportedRecord["bristol-scale"] = record.bristolScale;
-    exportedRecord.evacuation = record.evacuation;
-    if (record.wetness && record.wetness !== 0) exportedRecord.wetness = record.wetness;
-    if (record.pressure !== undefined && record.pressure !== 0) exportedRecord.pressure = record.pressure;
-  } else if (record.type === "symptoms") {
-    if (record.pain && record.pain !== 0) exportedRecord.pain = record.pain;
-    if (record.bloating && record.bloating !== 0) exportedRecord.bloating = record.bloating;
-  }
-
-  return exportedRecord;
-}
-
-function parseNumberValue(value, fallback = 0) {
-  const parsedValue = Number.parseInt(value, 10);
-  return Number.isNaN(parsedValue) ? fallback : parsedValue;
-}
-
-function clampNumberValue(value, min, max, fallback = min) {
-  const parsedValue = parseNumberValue(value, fallback);
-  return Math.min(max, Math.max(min, parsedValue));
-}
-
-function normalizeTextValue(value, maxLength = 120) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim().slice(0, maxLength);
-}
-
-function normalizeTagListValue(value, options = {}) {
-  const maxTags = options.maxTags || 20;
-  const maxTagLength = options.maxTagLength || 30;
-  if (!Array.isArray(value)) return [];
-
-  const uniqueTags = [];
-  value.forEach(tag => {
-    const normalizedTag = normalizeTextValue(tag, maxTagLength);
-    if (!normalizedTag || uniqueTags.includes(normalizedTag)) return;
-    if (uniqueTags.length < maxTags) {
-      uniqueTags.push(normalizedTag);
-    }
-  });
-
-  return uniqueTags;
-}
-
-function normalizeEvacuationValue(value) {
-  return value === "full" ? "full" : "partial";
-}
-
-function normalizeTimestampValue(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString();
-}
-
-function normalizeImportedRecord(record) {
-  if (!record || typeof record !== "object") return null;
-
-  const type = record.type;
-  const timestamp = normalizeTimestampValue(record.timestamp);
-  if (!type || !timestamp) return null;
-
-  if (type === "symptoms") {
-    return {
-      type,
-      timestamp,
-      createdAt: timestamp,
-      pain: clampNumberValue(record.pain, 0, 5, 0),
-      bloating: clampNumberValue(record.bloating, 0, 5, 0)
-    };
-  }
-
-  if (type === "bm") {
-    return {
-      type,
-      timestamp,
-      createdAt: timestamp,
-      tags: normalizeTagListValue(record.tags),
-      bristolScale: clampNumberValue(record["bristol-scale"] ?? record.bristolScale, 1, 7, 1),
-      evacuation: normalizeEvacuationValue(record.evacuation),
-      pressure: clampNumberValue(record.pressure, 0, 5, 0),
-      wetness: clampNumberValue(record.wetness, 0, 5, 0)
-    };
-  }
-
-  if (type === "food_log") {
-    const foodName = normalizeTextValue(record.foodName || record.text || "", 120);
-    return {
-      type,
-      timestamp,
-      createdAt: timestamp,
-      foodName,
-      foodTags: Array.isArray(record.tags)
-        ? normalizeTagListValue(record.tags)
-        : normalizeTagListValue(record.foodTags),
-      speed: clampNumberValue(record.speed, 0, 5, 0),
-      size: clampNumberValue(record.size, 0, 5, 0),
-      risk: clampNumberValue(record.risk, 0, 5, 0)
-    };
-  }
-
-  return null;
-}
-
-function getRecordSignature(record) {
-  const signatureRecord = formatRecordForExport(record);
-  delete signatureRecord.createdAt;
-  return JSON.stringify(signatureRecord);
-}
-
-function extractImportedRecords(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload["ibs-records"])) return payload["ibs-records"];
-  return null;
 }
 
 function syncFoodsFromImportedRecords(importedRecords) {
@@ -1121,7 +295,7 @@ function buildFoodDetails(entry, showAllTags) {
   if (cleanTags.length > 0) {
     const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
     const suffix = !showAllTags && cleanTags.length > 5 ? ", ..." : "";
-    details.push(`Zutaten: ${visibleTags.join(", ")}${suffix}`);
+   // details.push(`Zutaten: ${visibleTags.join(", ")}${suffix}`);
   }
 
   return details.join(" | ");
@@ -1129,22 +303,34 @@ function buildFoodDetails(entry, showAllTags) {
 
 function createEntryCard(entry, targetElementId) {
   const card = document.createElement("div");
-  card.className = "card";
+  card.className = "card entry-card";
   card.dataset.entryTimestamp = String(entry.timestamp);
 
+  const header = document.createElement("div");
+  header.className = "entry-card-header";
+
+  const heading = document.createElement("div");
+  heading.className = "entry-card-heading";
+
   const title = document.createElement("h3");
+  title.className = "entry-card-title";
+
+  const dateLine = document.createElement("div");
+  dateLine.className = "entry-card-date";
+
   const labels = document.createElement("div");
   labels.className = "labels";
   const date = new Date(entry.timestamp).toLocaleString();
   const showAllTags = targetElementId === "historyLog";
 
   if (entry.type === "symptoms") {
-    title.textContent = `Bauch & Blähungen - ${date}`;
+    title.textContent = "Symptome";
     const pain = entry.pain && entry.pain !== 0 ? `Bauch: ${entry.pain}` : "";
     const bloating = entry.bloating && entry.bloating !== 0 ? `Blähungen: ${entry.bloating}` : "";
-    labels.innerHTML = [pain, bloating].filter(Boolean).join(" | ");
+    const nausea = entry.nausea && entry.nausea !== 0 ? `Übelkeit: ${entry.nausea}` : "";
+    labels.innerHTML = [pain, bloating, nausea].filter(Boolean).join(" | ");
   } else if (entry.type === "bm") {
-    title.textContent = `Poopie - ${date}`;
+    title.textContent = "Poopie";
     const bristol = `Bristol: ${entry.bristolScale}`;
     const evacuation = `Evacuation: ${entry.evacuation}`;
     const pressure = entry.pressure && entry.pressure !== 0 ? `Druck: ${entry.pressure}` : "";
@@ -1152,22 +338,19 @@ function createEntryCard(entry, targetElementId) {
     labels.innerHTML = [bristol, evacuation, pressure, wetness].filter(Boolean).join(" | ");
   } else if (entry.type === "food_log") {
     const foodName = entry.foodName || "Essen";
-    title.textContent = `${foodName} - ${date}`;
+    title.textContent = `Essen - ${foodName}`;
     labels.textContent = buildFoodDetails(entry, showAllTags);
   } else {
-    title.textContent = `Eintrag - ${date}`;
+    title.textContent = "Eintrag";
   }
 
-  card.appendChild(title);
-  card.appendChild(labels);
-
-  if (entry.type === "food_log") {
-    const tagsDiv = buildTagContainer(entry.foodTags, showAllTags);
-    if (tagsDiv) card.appendChild(tagsDiv);
-  }
+  dateLine.textContent = date;
+  heading.appendChild(title);
+  heading.appendChild(dateLine);
+  header.appendChild(heading);
 
   if (targetElementId === "historyLog") {
-    card.appendChild(createCardActions([
+    header.appendChild(createCardActions([
       {
         text: "✏",
         onClick: event => editEntry(entry.timestamp, event),
@@ -1178,6 +361,14 @@ function createEntryCard(entry, targetElementId) {
         onClick: event => deleteEntry(entry.timestamp, event)
       }
     ]));
+  }
+
+  card.appendChild(header);
+  card.appendChild(labels);
+
+  if (entry.type === "food_log") {
+    const tagsDiv = buildTagContainer(entry.foodTags, showAllTags);
+    if (tagsDiv) card.appendChild(tagsDiv);
   }
 
   return card;
@@ -1231,16 +422,19 @@ function renderUnifiedLog(targetElementId, options = {}) {
 function renderSymptomsEditor(card, entry, records, entryIndex) {
   const painInput = createNumberSelect(0, 5, entry.pain);
   const bloatingInput = createNumberSelect(0, 5, entry.bloating);
+  const nauseaInput = createNumberSelect(0, 5, entry.nausea);
   const dateInput = createDateTimeInput(entry.timestamp);
   const previousTimestamp = entry.timestamp;
 
   appendField(card, "Bauchschmerzen", painInput);
   appendField(card, "Blähungen", bloatingInput);
+  appendField(card, "Übelkeit", nauseaInput);
   appendField(card, "Datum & Uhrzeit", dateInput);
 
   card.appendChild(createButton("Speichern", () => {
     entry.pain = parseInt(painInput.value, 10);
     entry.bloating = parseInt(bloatingInput.value, 10);
+    entry.nausea = parseInt(nauseaInput.value, 10);
     updateEntryTimestamp(entry, dateInput);
     records[entryIndex] = entry;
     refreshEditedEntry(records, previousTimestamp, entry);
@@ -1395,6 +589,7 @@ function resetBristolGroup(value = 0) {
 function resetSymptomsForm() {
   resetScaleGroup("painScale", "pain", 0);
   resetScaleGroup("bloatingScale", "bloating", 0);
+  resetScaleGroup("nauseaScale", "nausea", 0);
   byId("painDate").value = "";
 }
 
@@ -1411,15 +606,18 @@ function resetFoodForm() {
   resetScaleGroup("sizeScale", "size", 0);
   resetScaleGroup("riskScale", "risk", 0);
   lastSelectedFoodSuggestion = "";
+  lastSelectedTagSuggestion = "";
   byId("foodText").value = "";
   byId("tags").value = "";
   byId("foodDate").value = "";
   hideFoodSuggestions();
+  hideTagSuggestions();
 }
 
 function initScales() {
   setScaleButtons("painScale", "pain", 0);
   setScaleButtons("bloatingScale", "bloating", 0);
+  setScaleButtons("nauseaScale", "nausea", 0);
   setScaleButtons("pressureScale", "pressure", 0);
   setScaleButtons("wetnessScale", "wetness", 0);
   setScaleButtons("speedScale", "speed", 0);
@@ -1474,7 +672,8 @@ function savePainBloating() {
     timestamp: date,
     createdAt: new Date().toISOString(),
     pain: parseInt(byId("pain").value, 10),
-    bloating: parseInt(byId("bloating").value, 10)
+    bloating: parseInt(byId("bloating").value, 10),
+    nausea: parseInt(byId("nausea").value, 10)
   };
 
   const records = getRecords();
@@ -1501,65 +700,6 @@ function saveBM() {
   saveRecords(records);
   renderUnifiedLog("log");
   resetBmForm();
-}
-
-function addFoodFromList() {
-  const savedFoodsList = byId("savedFoodsList");
-  if (!savedFoodsList) return;
-
-  const existingCard = byId("addFoodCard");
-  if (existingCard) existingCard.remove();
-
-  const addCard = document.createElement("div");
-  addCard.className = "card";
-  addCard.id = "addFoodCard";
-
-  const title = document.createElement("h3");
-  title.textContent = "Neues Food hinzufügen";
-  addCard.appendChild(title);
-
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
-  nameInput.placeholder = "Food Name";
-  addCard.appendChild(nameInput);
-  addCard.appendChild(document.createElement("br"));
-
-  const tagsInput = document.createElement("input");
-  tagsInput.type = "text";
-  tagsInput.placeholder = "Zutaten (Komma getrennt)";
-  addCard.appendChild(tagsInput);
-  addCard.appendChild(document.createElement("br"));
-
-  addCard.appendChild(createButton("Speichern", () => {
-    const name = nameInput.value.trim();
-    if (!name) {
-      alert("Essen braucht einen Namen.");
-      return;
-    }
-
-    const tags = parseTagList(tagsInput.value);
-    const foods = getFoods();
-    if (foods.find(food => food.name.toLowerCase() === name.toLowerCase())) {
-      alert("Essen existiert bereits.");
-      return;
-    }
-
-    foods.push({
-      id: generateId(),
-      name,
-      tags,
-      createdAt: new Date().toISOString()
-    });
-    saveFoods(foods);
-    addCard.remove();
-    renderSavedFoods();
-  }));
-
-  addCard.appendChild(createButton("Abbrechen", () => addCard.remove(), {
-    className: "secondary-button"
-  }));
-
-  savedFoodsList.prepend(addCard);
 }
 
 function saveFood() {
@@ -1613,6 +753,7 @@ function initApp() {
   if (appInitialized) return;
   appInitialized = true;
 
+  ensureManifestLink();
   initNavigation();
   updateFoodSortButton();
   const importInput = byId("importRecordsInput");

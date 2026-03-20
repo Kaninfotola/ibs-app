@@ -403,12 +403,57 @@ section:hover {
   box-shadow: 0px 2px 8px rgba(255,153,153,0.10);
   animation: fadein 0.5s;
 }
+.entry-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+ 
+  margin-bottom: 8px;
+}
+
+.entry-card-heading {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+
+.entry-card-title {
+  margin: 0;
+  color: #3f3a3a;
+  font-size: 1.1em;
+  font-weight: 700;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.entry-card-date {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff6666;
+  line-height: 1.35;
+}
+
 .card .card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
   display: flex;
   gap: 6px;
+}
+
+.card.entry-card .card-actions {
+  position: static;
+  top: auto;
+  right: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .card .card-actions button {
   font-size: 12px;
@@ -435,10 +480,34 @@ section:hover {
 
 .card .labels {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   font-size: 13px;
   margin-bottom: 8px;
   color: #666;
+}
+
+@media (max-width: 520px) {
+  .entry-card .card-actions button {
+    padding: 6px 8px;
+    min-width: 34px;
+  }
+
+  .entry-card-date {
+    font-size: 13px;
+  }
+
+  .card .labels {
+    gap: 8px;
+  }
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-start;
+  margin-top: 8px;
 }
 
 .card .tag {
@@ -446,14 +515,171 @@ section:hover {
   color: #ff9999;
   padding: 3px 8px;
   border-radius: 6px;
-  margin-right: 6px;
   font-size: 12px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.3;
+  max-width: 100%;
 }
 .card p {
   margin: 8px 0 0 0;
   color: #444;
   font-size: 13px;
+}
+
+.monthly-wrapped-open {
+  overflow: hidden;
+}
+
+.monthly-wrapped-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(103, 41, 63, 0.48);
+  backdrop-filter: blur(8px);
+}
+
+.monthly-wrapped-overlay[hidden] {
+  display: none;
+}
+
+.monthly-wrapped-dialog {
+  width: min(100%, 920px);
+  max-height: min(92vh, 920px);
+  overflow-y: auto;
+  border-radius: 24px;
+  padding: 22px;
+  background: linear-gradient(180deg, #fff8fb 0%, #fff2f6 45%, #fffdfd 100%);
+  border: 1px solid rgba(232, 164, 190, 0.6);
+  box-shadow: 0 24px 80px rgba(124, 40, 74, 0.28);
+}
+
+.monthly-wrapped-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.monthly-wrapped-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 207, 223, 0.85);
+  color: #ba4f75;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.monthly-wrapped-header h2 {
+  margin: 10px 0 6px;
+  font-size: 1.9rem;
+  color: #d4537d;
+}
+
+.monthly-wrapped-subtitle {
+  margin: 0;
+  color: #805867;
+  font-size: 0.98rem;
+}
+
+.monthly-wrapped-close {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: 16px;
+}
+
+.monthly-wrapped-intro {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #6f5560;
+  line-height: 1.5;
+  border: 1px solid rgba(237, 201, 214, 0.9);
+}
+
+.monthly-wrapped-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.monthly-wrapped-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 243, 247, 0.96) 100%);
+  border: 1px solid rgba(241, 202, 216, 0.95);
+  box-shadow: 0 12px 30px rgba(226, 156, 182, 0.14);
+}
+
+.monthly-wrapped-card-top {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.monthly-wrapped-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffeaf1 0%, #ffd4e1 100%);
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.monthly-wrapped-card h3 {
+  margin: 0 0 6px;
+  color: #cb597f;
+  font-size: 1rem;
+}
+
+.monthly-wrapped-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #80324f;
+  word-break: break-word;
+}
+
+.monthly-wrapped-meta {
+  margin-top: 4px;
+  color: #8b6a76;
+  font-size: 0.88rem;
+}
+
+.monthly-wrapped-detail-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #6e5560;
+  font-size: 0.9rem;
+}
+
+.monthly-wrapped-detail-list li + li {
+  margin-top: 4px;
+}
+
+.monthly-wrapped-card p {
+  margin: 14px 0 0;
+  color: #5b4750;
+  line-height: 1.5;
+}
+
+.monthly-wrapped-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 #log {
   list-style: none;
@@ -466,6 +692,54 @@ label {
   color: #555;
   font-size: 14px;
 }
+
+.form-stacked-label {
+  position: relative;
+}
+
+.form-stacked-label .label-text {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.form-stacked-label input {
+  display: inline-block;
+  width: auto;
+  box-sizing: border-box;
+}
+
+.form-stacked-label .suggestions-list {
+  left: 0;
+  right: auto;
+  top: 100%;
+  margin-top: 4px;
+  min-width: 180px;
+}
+
+@media (max-width: 520px) {
+  .form-stacked-label {
+    margin-bottom: 10px;
+  }
+
+  .form-stacked-label .label-text {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+  }
+
+  .form-stacked-label input {
+    display: block;
+    width: 200px;
+  }
+
+  .form-stacked-label .suggestions-list {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    width: 200px;
+  }
+}
+
 .scale-group {
   display: flex;
   gap: 5px;
@@ -485,7 +759,7 @@ label {
 }
 .bristol-scale {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
@@ -562,5 +836,26 @@ label {
 
   .calendar-day-meta {
     font-size: 10px;
+  }
+
+  .monthly-wrapped-dialog {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .monthly-wrapped-header {
+    flex-direction: column;
+  }
+
+  .monthly-wrapped-close {
+    align-self: flex-end;
+  }
+
+  .monthly-wrapped-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .monthly-wrapped-header h2 {
+    font-size: 1.6rem;
   }
 }
