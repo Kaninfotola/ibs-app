@@ -132,6 +132,7 @@ function buildTagContainer(tags, showAllTags) {
   if (cleanTags.length === 0) return null;
 
   const tagsDiv = document.createElement("div");
+  tagsDiv.className = "tag-container";
   const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
 
   visibleTags.forEach(tag => {

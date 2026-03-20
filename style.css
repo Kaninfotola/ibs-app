@@ -403,12 +403,57 @@ section:hover {
   box-shadow: 0px 2px 8px rgba(255,153,153,0.10);
   animation: fadein 0.5s;
 }
+.entry-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+ 
+  margin-bottom: 8px;
+}
+
+.entry-card-heading {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+
+.entry-card-title {
+  margin: 0;
+  color: #3f3a3a;
+  font-size: 1.1em;
+  font-weight: 700;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.entry-card-date {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff6666;
+  line-height: 1.35;
+}
+
 .card .card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
   display: flex;
   gap: 6px;
+}
+
+.card.entry-card .card-actions {
+  position: static;
+  top: auto;
+  right: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .card .card-actions button {
   font-size: 12px;
@@ -435,10 +480,34 @@ section:hover {
 
 .card .labels {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   font-size: 13px;
   margin-bottom: 8px;
   color: #666;
+}
+
+@media (max-width: 520px) {
+  .entry-card .card-actions button {
+    padding: 6px 8px;
+    min-width: 34px;
+  }
+
+  .entry-card-date {
+    font-size: 13px;
+  }
+
+  .card .labels {
+    gap: 8px;
+  }
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-start;
+  margin-top: 8px;
 }
 
 .card .tag {
@@ -446,9 +515,11 @@ section:hover {
   color: #ff9999;
   padding: 3px 8px;
   border-radius: 6px;
-  margin-right: 6px;
   font-size: 12px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.3;
+  max-width: 100%;
 }
 .card p {
   margin: 8px 0 0 0;
@@ -621,6 +692,54 @@ label {
   color: #555;
   font-size: 14px;
 }
+
+.form-stacked-label {
+  position: relative;
+}
+
+.form-stacked-label .label-text {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.form-stacked-label input {
+  display: inline-block;
+  width: auto;
+  box-sizing: border-box;
+}
+
+.form-stacked-label .suggestions-list {
+  left: 0;
+  right: auto;
+  top: 100%;
+  margin-top: 4px;
+  min-width: 180px;
+}
+
+@media (max-width: 520px) {
+  .form-stacked-label {
+    margin-bottom: 10px;
+  }
+
+  .form-stacked-label .label-text {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+  }
+
+  .form-stacked-label input {
+    display: block;
+    width: 200px;
+  }
+
+  .form-stacked-label .suggestions-list {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    width: 200px;
+  }
+}
+
 .scale-group {
   display: flex;
   gap: 5px;
@@ -640,7 +759,7 @@ label {
 }
 .bristol-scale {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;

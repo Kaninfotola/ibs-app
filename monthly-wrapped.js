@@ -3,7 +3,7 @@ const MONTHLY_WRAPPED_STORAGE_KEYS = {
   shownMonth: "ibs-monthly-wrapped-shown-month"
 };
 
-const MONTHLY_WRAPPED_AUTO_SHOW_DAYS = 4;
+const MONTHLY_WRAPPED_AUTO_SHOW_DAYS = 7;
 
 function readWrappedRecords() {
   try {
@@ -86,6 +86,8 @@ function collectWrappedStats(records, monthRange) {
   let symptomEntryCount = 0;
   let totalPain = 0;
   let bloatingHeavyCount = 0;
+  let nauseaHeavyCount = 0;
+  let totalNausea = 0;
   let riskyFoodCount = 0;
   let totalRisk = 0;
 
@@ -115,12 +117,17 @@ function collectWrappedStats(records, monthRange) {
     if (record.type === "symptoms") {
       const pain = parseWrappedNumber(record.pain, 0);
       const bloating = parseWrappedNumber(record.bloating, 0);
+      const nausea = parseWrappedNumber(record.nausea, 0);
       symptomEntryCount += 1;
       totalPain += pain;
+      totalNausea += nausea;
       dayInfo.painValues.push(pain);
       dayInfo.maxPain = Math.max(dayInfo.maxPain, pain);
       if (bloating >= 3) {
         bloatingHeavyCount += 1;
+      }
+      if (nausea >= 3) {
+        nauseaHeavyCount += 1;
       }
     }
 
@@ -146,6 +153,7 @@ function collectWrappedStats(records, monthRange) {
   const painFreeDays = trackedDays.filter(day => day.painValues.length > 0 && day.painValues.every(value => value === 0)).length;
   const activeDays = trackedDays.length;
   const averagePain = symptomEntryCount > 0 ? (totalPain / symptomEntryCount) : 0;
+  const averageNausea = symptomEntryCount > 0 ? (totalNausea / symptomEntryCount) : 0;
   const averageRisk = foodEntryCount > 0
     ? totalRisk / foodEntryCount
     : 0;
@@ -187,7 +195,9 @@ function collectWrappedStats(records, monthRange) {
     activeDays,
     symptomEntryCount,
     averagePain,
+    averageNausea,
     bloatingHeavyCount,
+    nauseaHeavyCount,
     riskyFoodCount,
     averageRisk,
     poopChampionDay,
@@ -360,6 +370,20 @@ function buildWrappedCards(stats) {
         : stats.bloatingHeavyCount < 5
           ? "Ein paar windige Momente, aber noch kein offizieller Sturmbericht."
           : "Teils böige Lage. Deine innere Wetterapp hätte Warnstufe Gelb geschickt."
+    });
+  }
+
+  if (stats.symptomEntryCount > 0) {
+    cards.push({
+      emoji: "🤢",
+      title: "Übelkeitsradar",
+      value: `Ø ${formatWrappedDecimal(stats.averageNausea)}`,
+      meta: `${stats.nauseaHeavyCount} Einträge mit Übelkeit ≥ 3`,
+      joke: stats.nauseaHeavyCount === 0
+        ? "Magen überraschend gelassen. Das Karussell blieb diesen Monat meist stehen."
+        : stats.nauseaHeavyCount < 5
+          ? "Ein paar wacklige Momente, aber noch kein offizieller Seegang-Alarm."
+          : "Dein Magen wollte stellenweise Achterbahn fahren. Sicherheitsbügel bitte schließen."
     });
   }
 
@@ -538,8 +562,20 @@ function shouldAutoShowMonthlyWrapped(stats) {
   return shownMonth !== getMonthIdentifier(now);
 }
 
+function removeMonthlyWrappedButton() {
+  const button = document.getElementById("monthlyWrappedButton");
+  if (button) {
+    button.remove();
+  }
+}
+
 function addMonthlyWrappedButton(stats) {
   const historyActions = document.querySelector("#historySection .history-actions");
+  if (!isWithinMonthlyWrappedAutoShowWindow(new Date())) {
+    removeMonthlyWrappedButton();
+    return;
+  }
+
   if (!historyActions || document.getElementById("monthlyWrappedButton")) return;
 
   const button = document.createElement("button");
@@ -556,7 +592,11 @@ function initMonthlyWrapped() {
   const stats = collectWrappedStats(readWrappedRecords(), monthRange);
   const isAutoShowWindow = isWithinMonthlyWrappedAutoShowWindow(new Date());
 
-  addMonthlyWrappedButton(stats);
+  if (isAutoShowWindow) {
+    addMonthlyWrappedButton(stats);
+  } else {
+    removeMonthlyWrappedButton();
+  }
 
   if (shouldAutoShowMonthlyWrapped(stats)) {
     showMonthlyWrapped(stats, { markAsShown: true });

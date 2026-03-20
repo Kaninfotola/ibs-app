@@ -21,6 +21,7 @@ let historyCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth
 let historySelectedDateKey = null;
 let historyVisibleCount = 10;
 let lastSelectedFoodSuggestion = "";
+let lastSelectedTagSuggestion = "";
 
 const HISTORY_PAGE_SIZE = 10;
 
@@ -294,7 +295,7 @@ function buildFoodDetails(entry, showAllTags) {
   if (cleanTags.length > 0) {
     const visibleTags = showAllTags ? cleanTags : cleanTags.slice(0, 5);
     const suffix = !showAllTags && cleanTags.length > 5 ? ", ..." : "";
-    details.push(`Zutaten: ${visibleTags.join(", ")}${suffix}`);
+   // details.push(`Zutaten: ${visibleTags.join(", ")}${suffix}`);
   }
 
   return details.join(" | ");
@@ -302,22 +303,34 @@ function buildFoodDetails(entry, showAllTags) {
 
 function createEntryCard(entry, targetElementId) {
   const card = document.createElement("div");
-  card.className = "card";
+  card.className = "card entry-card";
   card.dataset.entryTimestamp = String(entry.timestamp);
 
+  const header = document.createElement("div");
+  header.className = "entry-card-header";
+
+  const heading = document.createElement("div");
+  heading.className = "entry-card-heading";
+
   const title = document.createElement("h3");
+  title.className = "entry-card-title";
+
+  const dateLine = document.createElement("div");
+  dateLine.className = "entry-card-date";
+
   const labels = document.createElement("div");
   labels.className = "labels";
   const date = new Date(entry.timestamp).toLocaleString();
   const showAllTags = targetElementId === "historyLog";
 
   if (entry.type === "symptoms") {
-    title.textContent = `Bauch & Blähungen - ${date}`;
+    title.textContent = "Symptome";
     const pain = entry.pain && entry.pain !== 0 ? `Bauch: ${entry.pain}` : "";
     const bloating = entry.bloating && entry.bloating !== 0 ? `Blähungen: ${entry.bloating}` : "";
-    labels.innerHTML = [pain, bloating].filter(Boolean).join(" | ");
+    const nausea = entry.nausea && entry.nausea !== 0 ? `Übelkeit: ${entry.nausea}` : "";
+    labels.innerHTML = [pain, bloating, nausea].filter(Boolean).join(" | ");
   } else if (entry.type === "bm") {
-    title.textContent = `Poopie - ${date}`;
+    title.textContent = "Poopie";
     const bristol = `Bristol: ${entry.bristolScale}`;
     const evacuation = `Evacuation: ${entry.evacuation}`;
     const pressure = entry.pressure && entry.pressure !== 0 ? `Druck: ${entry.pressure}` : "";
@@ -325,22 +338,19 @@ function createEntryCard(entry, targetElementId) {
     labels.innerHTML = [bristol, evacuation, pressure, wetness].filter(Boolean).join(" | ");
   } else if (entry.type === "food_log") {
     const foodName = entry.foodName || "Essen";
-    title.textContent = `${foodName} - ${date}`;
+    title.textContent = `Essen - ${foodName}`;
     labels.textContent = buildFoodDetails(entry, showAllTags);
   } else {
-    title.textContent = `Eintrag - ${date}`;
+    title.textContent = "Eintrag";
   }
 
-  card.appendChild(title);
-  card.appendChild(labels);
-
-  if (entry.type === "food_log") {
-    const tagsDiv = buildTagContainer(entry.foodTags, showAllTags);
-    if (tagsDiv) card.appendChild(tagsDiv);
-  }
+  dateLine.textContent = date;
+  heading.appendChild(title);
+  heading.appendChild(dateLine);
+  header.appendChild(heading);
 
   if (targetElementId === "historyLog") {
-    card.appendChild(createCardActions([
+    header.appendChild(createCardActions([
       {
         text: "✏",
         onClick: event => editEntry(entry.timestamp, event),
@@ -351,6 +361,14 @@ function createEntryCard(entry, targetElementId) {
         onClick: event => deleteEntry(entry.timestamp, event)
       }
     ]));
+  }
+
+  card.appendChild(header);
+  card.appendChild(labels);
+
+  if (entry.type === "food_log") {
+    const tagsDiv = buildTagContainer(entry.foodTags, showAllTags);
+    if (tagsDiv) card.appendChild(tagsDiv);
   }
 
   return card;
@@ -404,16 +422,19 @@ function renderUnifiedLog(targetElementId, options = {}) {
 function renderSymptomsEditor(card, entry, records, entryIndex) {
   const painInput = createNumberSelect(0, 5, entry.pain);
   const bloatingInput = createNumberSelect(0, 5, entry.bloating);
+  const nauseaInput = createNumberSelect(0, 5, entry.nausea);
   const dateInput = createDateTimeInput(entry.timestamp);
   const previousTimestamp = entry.timestamp;
 
   appendField(card, "Bauchschmerzen", painInput);
   appendField(card, "Blähungen", bloatingInput);
+  appendField(card, "Übelkeit", nauseaInput);
   appendField(card, "Datum & Uhrzeit", dateInput);
 
   card.appendChild(createButton("Speichern", () => {
     entry.pain = parseInt(painInput.value, 10);
     entry.bloating = parseInt(bloatingInput.value, 10);
+    entry.nausea = parseInt(nauseaInput.value, 10);
     updateEntryTimestamp(entry, dateInput);
     records[entryIndex] = entry;
     refreshEditedEntry(records, previousTimestamp, entry);
@@ -568,6 +589,7 @@ function resetBristolGroup(value = 0) {
 function resetSymptomsForm() {
   resetScaleGroup("painScale", "pain", 0);
   resetScaleGroup("bloatingScale", "bloating", 0);
+  resetScaleGroup("nauseaScale", "nausea", 0);
   byId("painDate").value = "";
 }
 
@@ -584,15 +606,18 @@ function resetFoodForm() {
   resetScaleGroup("sizeScale", "size", 0);
   resetScaleGroup("riskScale", "risk", 0);
   lastSelectedFoodSuggestion = "";
+  lastSelectedTagSuggestion = "";
   byId("foodText").value = "";
   byId("tags").value = "";
   byId("foodDate").value = "";
   hideFoodSuggestions();
+  hideTagSuggestions();
 }
 
 function initScales() {
   setScaleButtons("painScale", "pain", 0);
   setScaleButtons("bloatingScale", "bloating", 0);
+  setScaleButtons("nauseaScale", "nausea", 0);
   setScaleButtons("pressureScale", "pressure", 0);
   setScaleButtons("wetnessScale", "wetness", 0);
   setScaleButtons("speedScale", "speed", 0);
@@ -647,7 +672,8 @@ function savePainBloating() {
     timestamp: date,
     createdAt: new Date().toISOString(),
     pain: parseInt(byId("pain").value, 10),
-    bloating: parseInt(byId("bloating").value, 10)
+    bloating: parseInt(byId("bloating").value, 10),
+    nausea: parseInt(byId("nausea").value, 10)
   };
 
   const records = getRecords();

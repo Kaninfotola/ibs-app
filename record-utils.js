@@ -21,6 +21,7 @@ function formatRecordForExport(record) {
   } else if (record.type === "symptoms") {
     if (record.pain && record.pain !== 0) exportedRecord.pain = record.pain;
     if (record.bloating && record.bloating !== 0) exportedRecord.bloating = record.bloating;
+    if (record.nausea && record.nausea !== 0) exportedRecord.nausea = record.nausea;
   }
 
   return exportedRecord;
@@ -39,7 +40,8 @@ function normalizeImportedRecord(record) {
       timestamp,
       createdAt: timestamp,
       pain: clampNumberValue(record.pain, 0, 5, 0),
-      bloating: clampNumberValue(record.bloating, 0, 5, 0)
+      bloating: clampNumberValue(record.bloating, 0, 5, 0),
+      nausea: clampNumberValue(record.nausea, 0, 5, 0)
     };
   }
 

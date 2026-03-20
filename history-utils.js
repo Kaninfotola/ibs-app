@@ -37,6 +37,8 @@ function buildDaySeveritySummary(dayInfo) {
   if (dayInfo.painVeryHighCount > 0) details.push(`${dayInfo.painVeryHighCount}× Bauchweh ≥4`);
   if (dayInfo.painHighCount > 0) details.push(`${dayInfo.painHighCount}× Bauchweh 3`);
   if (dayInfo.painMediumCount > 0) details.push(`${dayInfo.painMediumCount}× Bauchweh 2`);
+  if (dayInfo.nauseaHighCount > 0) details.push(`${dayInfo.nauseaHighCount}× Übelkeit ≥3`);
+  if (dayInfo.nauseaLowCount > 0) details.push(`${dayInfo.nauseaLowCount}× Übelkeit 1/2`);
   if (dayInfo.bristolVeryHighCount > 0) details.push(`${dayInfo.bristolVeryHighCount}× Poopie ≥6`);
   if (dayInfo.bristolHighCount > 0) details.push(`${dayInfo.bristolHighCount}× Poopie 1`);
   if (dayInfo.bristolMediumCount > 0) details.push(`${dayInfo.bristolMediumCount}× Poopie 2/5`);
@@ -49,14 +51,16 @@ function classifyDaySeverity(dayInfo) {
     return "neutral";
   }
 
-  if (dayInfo.painVeryHighCount >= 2 || dayInfo.bristolVeryHighCount >= 4 || dayInfo.score >= 9) {
+  if (dayInfo.painVeryHighCount >= 2 || dayInfo.nauseaHighCount >= 3 || dayInfo.bristolVeryHighCount >= 4 || dayInfo.score >= 9) {
     return "very-severe";
   }
 
   if (
     dayInfo.painVeryHighCount >= 1 ||
+    dayInfo.nauseaHighCount >= 2 ||
     dayInfo.painHighCount >= 2 ||
     dayInfo.bristolVeryHighCount >= 2 ||
+    (dayInfo.nauseaHighCount >= 1 && (dayInfo.painHighCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
     (dayInfo.bristolVeryHighCount >= 1 && (dayInfo.painHighCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
     dayInfo.bristolMediumCount >= 3 ||
     dayInfo.score >= 6
@@ -66,16 +70,18 @@ function classifyDaySeverity(dayInfo) {
 
   if (
     dayInfo.painHighCount >= 1 ||
+    dayInfo.nauseaHighCount >= 1 ||
     dayInfo.bristolVeryHighCount >= 1 ||
     (dayInfo.bristolHighCount >= 1 && (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.painHighCount >= 1 || dayInfo.painVeryHighCount >= 1)) ||
     dayInfo.painMediumCount >= 2 ||
+    dayInfo.nauseaLowCount >= 2 ||
     dayInfo.bristolMediumCount >= 1 ||
     dayInfo.score >= 3
   ) {
     return "medium";
   }
 
-  if (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.bristolHighCount >= 1 || dayInfo.score > 0) {
+  if (dayInfo.painLowCount >= 1 || dayInfo.painMediumCount >= 1 || dayInfo.nauseaLowCount >= 1 || dayInfo.bristolHighCount >= 1 || dayInfo.score > 0) {
     return "mild";
   }
 
@@ -96,6 +102,8 @@ function buildHistoryDayMap(records) {
         painVeryHighCount: 0,
         painHighCount: 0,
         painMediumCount: 0,
+        nauseaHighCount: 0,
+        nauseaLowCount: 0,
         bristolVeryHighCount: 0,
         bristolHighCount: 0,
         bristolMediumCount: 0,
@@ -109,6 +117,7 @@ function buildHistoryDayMap(records) {
     if (record.type === "symptoms") {
       const pain = parseNumberValue(record.pain, 0);
       const bloating = parseNumberValue(record.bloating, 0);
+      const nausea = parseNumberValue(record.nausea, 0);
 
       if (pain >= 4) {
         dayInfo.painVeryHighCount += 1;
@@ -127,6 +136,14 @@ function buildHistoryDayMap(records) {
       if (bloating >= 3) {
         dayInfo.score += 1;
       } else if (bloating === 2) {
+        dayInfo.score += 0.5;
+      }
+
+      if (nausea >= 3) {
+        dayInfo.nauseaHighCount += 1;
+        dayInfo.score += 1.5;
+      } else if (nausea >= 1) {
+        dayInfo.nauseaLowCount += 1;
         dayInfo.score += 0.5;
       }
     }

@@ -26,14 +26,20 @@
 
 <div id="homeSection">
   <section>
-  <h2>Bauchschmerzen & Blähungen</h2>
+  <h2>Bauchschmerzen, Blähungen & Übelkeit</h2>
   <label>Bauchschmerzen:</label>
   <div class="scale-group" id="painScale"></div>
   <input type="hidden" id="pain" value="1">
   <label>Blähungen:</label>
   <div class="scale-group" id="bloatingScale"></div>
   <input type="hidden" id="bloating" value="1">
-  <label>Datum & Uhrzeit: <input type="datetime-local" id="painDate"></label>
+  <label>Übelkeit:</label>
+  <div class="scale-group" id="nauseaScale"></div>
+  <input type="hidden" id="nausea" value="1">
+  <label class="form-stacked-label">
+    <span class="label-text">Datum & Uhrzeit</span>
+    <input type="datetime-local" id="painDate">
+  </label>
   <button onclick="savePainBloating()">Speichern</button>
   </section>
   <section>
@@ -41,7 +47,8 @@
   <label>Poopie Konsistenz (1-7):</label>
   <div id="bristolScale" class="bristol-scale"></div>
   <input type="hidden" id="bristol" value="0">
-  <label>Entleerung: 
+  <label class="form-stacked-label">
+    <span class="label-text">Entleerung</span>
     <select id="evacuation">
       <option value="partial">Teilweise</option>
       <option value="full">Vollständig</option>
@@ -50,10 +57,13 @@
   <label>Druck:</label>
   <div class="scale-group" id="pressureScale"></div>
   <input type="hidden" id="pressure" value="1">
-  <label>Nässe:</label>
+ <!-- <label>Nässe:</label>
   <div class="scale-group" id="wetnessScale"></div>
-  <input type="hidden" id="wetness" value="1">
-  <label>Datum & Uhrzeit: <input type="datetime-local" id="bmDate"></label>
+  <input type="hidden" id="wetness" value="1"> -->
+  <label class="form-stacked-label">
+    <span class="label-text">Datum & Uhrzeit</span>
+    <input type="datetime-local" id="bmDate">
+  </label>
   <button onclick="saveBM()">Speichern</button>
   </section>
   <section>
@@ -67,12 +77,20 @@
   <label>Risiko:</label>
   <div class="scale-group" id="riskScale"></div>
   <input type="hidden" id="risk" value="0">
-  <label>Essensname:
+  <label class="form-stacked-label">
+    <span class="label-text">Essensname</span>
     <input type="text" id="foodText" autocomplete="off" oninput="showFoodSuggestions()" onfocus="showFoodSuggestions()">
     <div id="foodSuggestions" class="suggestions-list" style="display:none;"></div>
   </label>
-  <label>Zutaten (Komma getrennt): <input type="text" id="tags"></label>
-  <label>Datum & Uhrzeit: <input type="datetime-local" id="foodDate"></label>
+  <label class="form-stacked-label">
+    <span class="label-text">Zutaten (Komma getrennt)</span>
+    <input type="text" id="tags" autocomplete="off" oninput="showTagSuggestions()" onfocus="showTagSuggestions()">
+    <div id="tagSuggestions" class="suggestions-list" style="display:none;"></div>
+  </label>
+  <label class="form-stacked-label">
+    <span class="label-text">Datum & Uhrzeit</span>
+    <input type="datetime-local" id="foodDate">
+  </label>
   <button onclick="saveFood()">Speichern</button>
 </section>
 <section>

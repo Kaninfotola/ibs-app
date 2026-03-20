@@ -83,8 +83,75 @@ function getFoodSuggestions(value, foods) {
   return uniqueNames.filter(name => name.toLowerCase().includes(value));
 }
 
+function getAllUsedFoodTags() {
+  const tagMap = new Map();
+
+  getFoods().forEach(food => {
+    if (!Array.isArray(food.tags)) return;
+
+    food.tags.forEach(tag => {
+      const normalizedTag = String(tag || "").trim();
+      if (!normalizedTag) return;
+
+      const key = normalizedTag.toLowerCase();
+      if (!tagMap.has(key)) {
+        tagMap.set(key, normalizedTag);
+      }
+    });
+  });
+
+  getRecords().forEach(record => {
+    if (record?.type !== "food_log" || !Array.isArray(record.foodTags)) return;
+
+    record.foodTags.forEach(tag => {
+      const normalizedTag = String(tag || "").trim();
+      if (!normalizedTag) return;
+
+      const key = normalizedTag.toLowerCase();
+      if (!tagMap.has(key)) {
+        tagMap.set(key, normalizedTag);
+      }
+    });
+  });
+
+  return Array.from(tagMap.values()).sort((tagA, tagB) => tagA.localeCompare(tagB, "de", { sensitivity: "base" }));
+}
+
+function getCurrentTagToken(value) {
+  const parts = String(value || "").split(",");
+  return parts[parts.length - 1].trim().toLowerCase();
+}
+
+function getUsedTagSuggestions(value, allTags) {
+  const rawValue = String(value || "");
+  const currentToken = getCurrentTagToken(rawValue);
+  const alreadySelected = new Set(
+    rawValue
+      .split(",")
+      .slice(0, -1)
+      .map(tag => tag.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  const availableTags = allTags.filter(tag => !alreadySelected.has(tag.toLowerCase()));
+
+  if (!currentToken) {
+    return availableTags.slice(0, 6);
+  }
+
+  return availableTags.filter(tag => tag.toLowerCase().includes(currentToken)).slice(0, 8);
+}
+
 function hideFoodSuggestions() {
   const suggestionsDiv = byId("foodSuggestions");
+  if (!suggestionsDiv) return;
+
+  suggestionsDiv.style.display = "none";
+  suggestionsDiv.innerHTML = "";
+}
+
+function hideTagSuggestions() {
+  const suggestionsDiv = byId("tagSuggestions");
   if (!suggestionsDiv) return;
 
   suggestionsDiv.style.display = "none";
@@ -146,13 +213,71 @@ function showFoodSuggestions() {
   suggestionsDiv.style.display = "block";
 }
 
-function hideFoodSuggestionsOnOutsideClick(event) {
-  const suggestionsDiv = byId("foodSuggestions");
-  const input = byId("foodText");
-  if (!suggestionsDiv || !input) return;
+function applyTagSuggestionSelection(tag) {
+  const input = byId("tags");
+  if (!input) return;
 
-  if (event.target !== input && !suggestionsDiv.contains(event.target)) {
+  const parts = input.value.split(",");
+  const previousTags = parts
+    .slice(0, -1)
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  previousTags.push(tag);
+  input.value = `${previousTags.join(", ")}, `;
+  lastSelectedTagSuggestion = tag.trim().toLowerCase();
+  hideTagSuggestions();
+  input.focus();
+}
+
+function showTagSuggestions() {
+  const input = byId("tags");
+  const suggestionsDiv = byId("tagSuggestions");
+  if (!input || !suggestionsDiv) return;
+
+  const currentToken = getCurrentTagToken(input.value);
+  if (currentToken !== lastSelectedTagSuggestion) {
+    lastSelectedTagSuggestion = "";
+  }
+
+  if (currentToken && currentToken === lastSelectedTagSuggestion) {
+    hideTagSuggestions();
+    return;
+  }
+
+  const allTags = getAllUsedFoodTags();
+  const suggestions = getUsedTagSuggestions(input.value, allTags);
+  if (suggestions.length === 0) {
+    hideTagSuggestions();
+    return;
+  }
+
+  suggestionsDiv.innerHTML = "";
+  suggestions.forEach(tag => {
+    const item = document.createElement("div");
+    item.className = "suggestion-item";
+    item.textContent = tag;
+    item.onpointerdown = function(event) {
+      event.preventDefault();
+      applyTagSuggestionSelection(tag);
+    };
+    suggestionsDiv.appendChild(item);
+  });
+
+  suggestionsDiv.style.display = "block";
+}
+
+function hideFoodSuggestionsOnOutsideClick(event) {
+  const foodSuggestionsDiv = byId("foodSuggestions");
+  const foodInput = byId("foodText");
+  if (foodSuggestionsDiv && foodInput && event.target !== foodInput && !foodSuggestionsDiv.contains(event.target)) {
     hideFoodSuggestions();
+  }
+
+  const tagSuggestionsDiv = byId("tagSuggestions");
+  const tagInput = byId("tags");
+  if (tagSuggestionsDiv && tagInput && event.target !== tagInput && !tagSuggestionsDiv.contains(event.target)) {
+    hideTagSuggestions();
   }
 }
 
