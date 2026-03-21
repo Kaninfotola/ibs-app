@@ -692,7 +692,7 @@ function saveBM() {
     bristolScale: parseInt(byId("bristol").value, 10),
     evacuation: byId("evacuation").value,
     pressure: parseInt(byId("pressure").value, 10),
-    wetness: parseInt(byId("wetness").value, 10)
+   // wetness: parseInt(byId("wetness").value, 10)
   };
 
   const records = getRecords();
