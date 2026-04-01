@@ -20,8 +20,6 @@ let historyCalendarVisible = false;
 let historyCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let historySelectedDateKey = null;
 let historyVisibleCount = 10;
-let lastSelectedFoodSuggestion = "";
-let lastSelectedTagSuggestion = "";
 
 const HISTORY_PAGE_SIZE = 10;
 
@@ -605,8 +603,6 @@ function resetFoodForm() {
   resetScaleGroup("speedScale", "speed", 0);
   resetScaleGroup("sizeScale", "size", 0);
   resetScaleGroup("riskScale", "risk", 0);
-  lastSelectedFoodSuggestion = "";
-  lastSelectedTagSuggestion = "";
   byId("foodText").value = "";
   byId("tags").value = "";
   byId("foodDate").value = "";
@@ -691,7 +687,7 @@ function saveBM() {
     createdAt: new Date().toISOString(),
     bristolScale: parseInt(byId("bristol").value, 10),
     evacuation: byId("evacuation").value,
-    pressure: parseInt(byId("pressure").value, 10),
+    pressure: parseInt(byId("pressure").value, 10)
    // wetness: parseInt(byId("wetness").value, 10)
   };
 
@@ -760,7 +756,9 @@ function initApp() {
   if (importInput) {
     importInput.addEventListener("change", handleImportRecordsSelection);
   }
-  document.addEventListener("click", hideFoodSuggestionsOnOutsideClick);
+  document.addEventListener("pointerdown", hideFoodSuggestionsOnOutsideClick);
+  window.addEventListener("scroll", hideFoodSuggestionsOnScroll, true);
+  window.addEventListener("resize", hideAllFoodSuggestions);
   initScales();
   renderUnifiedLog("log");
 }

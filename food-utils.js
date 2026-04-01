@@ -158,21 +158,52 @@ function hideTagSuggestions() {
   suggestionsDiv.innerHTML = "";
 }
 
+function hideAllFoodSuggestions() {
+  hideFoodSuggestions();
+  hideTagSuggestions();
+}
+
+function moveCursorToEnd(input) {
+  if (!input) return;
+
+  const endPosition = input.value.length;
+  input.focus();
+
+  if (typeof input.setSelectionRange === "function") {
+    input.setSelectionRange(endPosition, endPosition);
+  }
+
+  input.scrollLeft = input.scrollWidth;
+}
+
+function bindSuggestionItemSelection(item, onSelect) {
+  item.addEventListener("pointerdown", event => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
+  item.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect();
+  });
+}
+
 function applyFoodSuggestionSelection(name, foods) {
   const input = byId("foodText");
   const tagsInput = byId("tags");
   if (!input) return;
 
   input.value = name;
-  lastSelectedFoodSuggestion = name.trim().toLowerCase();
+  moveCursorToEnd(input);
 
   const selectedFood = foods.find(food => food.name.toLowerCase() === name.toLowerCase());
   if (selectedFood && selectedFood.tags && tagsInput) {
     tagsInput.value = selectedFood.tags.filter(Boolean).join(", ");
+    moveCursorToEnd(tagsInput);
   }
 
   hideFoodSuggestions();
-  input.blur();
 }
 
 function showFoodSuggestions() {
@@ -181,14 +212,6 @@ function showFoodSuggestions() {
   if (!input || !suggestionsDiv) return;
 
   const value = input.value.trim().toLowerCase();
-  if (value !== lastSelectedFoodSuggestion) {
-    lastSelectedFoodSuggestion = "";
-  }
-
-  if (value && value === lastSelectedFoodSuggestion) {
-    hideFoodSuggestions();
-    return;
-  }
 
   const foods = getFoods().filter(food => food.name && food.name.trim() !== "");
   const suggestions = getFoodSuggestions(value, foods);
@@ -203,10 +226,7 @@ function showFoodSuggestions() {
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.textContent = name;
-    item.onpointerdown = function(event) {
-      event.preventDefault();
-      applyFoodSuggestionSelection(name, foods);
-    };
+    bindSuggestionItemSelection(item, () => applyFoodSuggestionSelection(name, foods));
     suggestionsDiv.appendChild(item);
   });
 
@@ -225,25 +245,17 @@ function applyTagSuggestionSelection(tag) {
 
   previousTags.push(tag);
   input.value = `${previousTags.join(", ")}, `;
-  lastSelectedTagSuggestion = tag.trim().toLowerCase();
-  hideTagSuggestions();
-  input.focus();
+  moveCursorToEnd(input);
+
+  setTimeout(() => {
+    showTagSuggestions();
+  }, 0);
 }
 
 function showTagSuggestions() {
   const input = byId("tags");
   const suggestionsDiv = byId("tagSuggestions");
   if (!input || !suggestionsDiv) return;
-
-  const currentToken = getCurrentTagToken(input.value);
-  if (currentToken !== lastSelectedTagSuggestion) {
-    lastSelectedTagSuggestion = "";
-  }
-
-  if (currentToken && currentToken === lastSelectedTagSuggestion) {
-    hideTagSuggestions();
-    return;
-  }
 
   const allTags = getAllUsedFoodTags();
   const suggestions = getUsedTagSuggestions(input.value, allTags);
@@ -257,10 +269,7 @@ function showTagSuggestions() {
     const item = document.createElement("div");
     item.className = "suggestion-item";
     item.textContent = tag;
-    item.onpointerdown = function(event) {
-      event.preventDefault();
-      applyTagSuggestionSelection(tag);
-    };
+    bindSuggestionItemSelection(item, () => applyTagSuggestionSelection(tag));
     suggestionsDiv.appendChild(item);
   });
 
@@ -279,6 +288,23 @@ function hideFoodSuggestionsOnOutsideClick(event) {
   if (tagSuggestionsDiv && tagInput && event.target !== tagInput && !tagSuggestionsDiv.contains(event.target)) {
     hideTagSuggestions();
   }
+}
+
+function isScrollInsideSuggestionList(event) {
+  const eventTarget = event?.target;
+  if (!(eventTarget instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(eventTarget.closest("#foodSuggestions, #tagSuggestions"));
+}
+
+function hideFoodSuggestionsOnScroll(event) {
+  if (isScrollInsideSuggestionList(event)) {
+    return;
+  }
+
+  hideAllFoodSuggestions();
 }
 
 function createFoodCard(food) {

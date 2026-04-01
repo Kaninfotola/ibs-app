@@ -79,12 +79,12 @@
   <input type="hidden" id="risk" value="0">
   <label class="form-stacked-label">
     <span class="label-text">Essensname</span>
-    <input type="text" id="foodText" autocomplete="off" oninput="showFoodSuggestions()" onfocus="showFoodSuggestions()">
+    <input type="text" id="foodText" autocomplete="off" oninput="showFoodSuggestions()" onfocus="showFoodSuggestions()" onclick="showFoodSuggestions()">
     <div id="foodSuggestions" class="suggestions-list" style="display:none;"></div>
   </label>
   <label class="form-stacked-label">
     <span class="label-text">Zutaten (Komma getrennt)</span>
-    <input type="text" id="tags" autocomplete="off" oninput="showTagSuggestions()" onfocus="showTagSuggestions()">
+    <input type="text" id="tags" autocomplete="off" oninput="showTagSuggestions()" onfocus="showTagSuggestions()" onclick="showTagSuggestions()">
     <div id="tagSuggestions" class="suggestions-list" style="display:none;"></div>
   </label>
   <label class="form-stacked-label">
