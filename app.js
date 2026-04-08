@@ -756,9 +756,22 @@ function initApp() {
   if (importInput) {
     importInput.addEventListener("change", handleImportRecordsSelection);
   }
+
+  const foodInput = byId("foodText");
+  if (foodInput) {
+    ["input", "focus", "click", "keyup", "change"].forEach(eventName => {
+      foodInput.addEventListener(eventName, showFoodSuggestions);
+    });
+  }
+
+  const tagsInput = byId("tags");
+  if (tagsInput) {
+    ["input", "focus", "click", "keyup", "change"].forEach(eventName => {
+      tagsInput.addEventListener(eventName, showTagSuggestions);
+    });
+  }
+
   document.addEventListener("pointerdown", hideFoodSuggestionsOnOutsideClick);
-  window.addEventListener("scroll", hideFoodSuggestionsOnScroll, true);
-  window.addEventListener("resize", hideAllFoodSuggestions);
   initScales();
   renderUnifiedLog("log");
 }

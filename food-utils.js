@@ -66,21 +66,87 @@ function findFoodCard(foodId) {
   return Array.from(savedFoodsList.querySelectorAll(".card")).find(card => card.dataset.foodId === String(foodId)) || null;
 }
 
-function getFoodSuggestions(value, foods) {
-  const uniqueNames = Array.from(new Set(foods.map(food => food.name)));
+function normalizeFoodSuggestionText(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("de-DE");
+}
 
-  if (!value) {
-    const recentNames = [];
-    for (let index = foods.length - 1; index >= 0 && recentNames.length < 4; index--) {
-      const name = foods[index].name;
-      if (name && !recentNames.includes(name)) {
-        recentNames.push(name);
+function getFoodUsageStats() {
+  const usageMap = new Map();
+
+  getRecords()
+    .filter(record => record?.type === "food_log" && record.foodName)
+    .forEach(record => {
+      const key = normalizeFoodSuggestionText(record.foodName);
+      if (!key) return;
+
+      const timestamp = new Date(record.timestamp || record.createdAt || 0).getTime();
+      const existing = usageMap.get(key);
+
+      if (!existing) {
+        usageMap.set(key, {
+          count: 1,
+          lastUsedAt: Number.isFinite(timestamp) ? timestamp : 0
+        });
+        return;
       }
-    }
-    return recentNames;
+
+      existing.count += 1;
+      existing.lastUsedAt = Math.max(existing.lastUsedAt, Number.isFinite(timestamp) ? timestamp : 0);
+    });
+
+  return usageMap;
+}
+
+function getFoodSuggestions(value, foods, limit = 10) {
+  const usageMap = getFoodUsageStats();
+  const normalizedQuery = normalizeFoodSuggestionText(value);
+  const uniqueFoods = [];
+  const seenNames = new Set();
+
+  foods.forEach(food => {
+    const name = String(food?.name || "").trim();
+    if (!name) return;
+
+    const normalizedName = normalizeFoodSuggestionText(name);
+    if (!normalizedName || seenNames.has(normalizedName)) return;
+
+    seenNames.add(normalizedName);
+    const usage = usageMap.get(normalizedName) || { count: 0, lastUsedAt: 0 };
+
+    uniqueFoods.push({
+      name,
+      normalizedName,
+      usageCount: usage.count,
+      lastUsedAt: usage.lastUsedAt
+    });
+  });
+
+  if (!normalizedQuery) {
+    return uniqueFoods
+      .sort((foodA, foodB) => {
+        if (foodB.lastUsedAt !== foodA.lastUsedAt) {
+          return foodB.lastUsedAt - foodA.lastUsedAt;
+        }
+
+        if (foodB.usageCount !== foodA.usageCount) {
+          return foodB.usageCount - foodA.usageCount;
+        }
+
+        return foodA.name.localeCompare(foodB.name, "de", { sensitivity: "base" });
+      })
+      .slice(0, limit)
+      .map(food => food.name);
   }
 
-  return uniqueNames.filter(name => name.toLowerCase().includes(value));
+  return uniqueFoods
+    .filter(food => food.normalizedName.startsWith(normalizedQuery))
+    .sort((foodA, foodB) => {
+      return foodA.name.localeCompare(foodB.name, "de", { sensitivity: "base" });
+    })
+    .slice(0, limit)
+    .map(food => food.name);
 }
 
 function getAllUsedFoodTags() {
@@ -139,7 +205,10 @@ function getUsedTagSuggestions(value, allTags) {
     return availableTags.slice(0, 6);
   }
 
-  return availableTags.filter(tag => tag.toLowerCase().includes(currentToken)).slice(0, 8);
+  return availableTags
+    .filter(tag => tag.toLowerCase().startsWith(currentToken))
+    .sort((tagA, tagB) => tagA.localeCompare(tagB, "de", { sensitivity: "base" }))
+    .slice(0, 8);
 }
 
 function hideFoodSuggestions() {
@@ -180,11 +249,6 @@ function bindSuggestionItemSelection(item, onSelect) {
   item.addEventListener("pointerdown", event => {
     event.preventDefault();
     event.stopPropagation();
-  });
-
-  item.addEventListener("click", event => {
-    event.preventDefault();
-    event.stopPropagation();
     onSelect();
   });
 }
@@ -211,10 +275,8 @@ function showFoodSuggestions() {
   const suggestionsDiv = byId("foodSuggestions");
   if (!input || !suggestionsDiv) return;
 
-  const value = input.value.trim().toLowerCase();
-
   const foods = getFoods().filter(food => food.name && food.name.trim() !== "");
-  const suggestions = getFoodSuggestions(value, foods);
+  const suggestions = getFoodSuggestions(input.value, foods, 10);
 
   if (suggestions.length === 0) {
     hideFoodSuggestions();

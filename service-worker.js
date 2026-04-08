@@ -1,4 +1,4 @@
-const CACHE_NAME = "ibs-cache-v3.5";
+const CACHE_NAME = "ibs-cache-v3.5.2";
 
 const FILES_TO_CACHE = [
   "/",
